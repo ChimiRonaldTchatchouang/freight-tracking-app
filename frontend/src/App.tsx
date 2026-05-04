@@ -8,6 +8,7 @@ import { ExpeditionsPage } from './pages/Expeditions'
 import { TrackingPage } from './pages/Tracking'
 import { AdminPage } from './pages/Admin'
 import { FormPage } from './pages/Form'
+import { DebugPage } from './pages/Debug'
 import { NotFoundPage } from './pages/NotFound'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -23,6 +24,7 @@ export function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/track" element={<TrackingPage />} />
         <Route path="/track/:code" element={<TrackingPage />} />
+        <Route path="/debug" element={<DebugPage />} />
 
         {/* Protected Routes */}
         <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />

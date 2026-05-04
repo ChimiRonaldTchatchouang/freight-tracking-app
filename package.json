@@ -1,0 +1,15 @@
+{
+  "name": "freight-tracking-app",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "build": "npm --prefix frontend run build && npm --prefix backend run build"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "jsonwebtoken": "^9.0.2"
+  }
+}

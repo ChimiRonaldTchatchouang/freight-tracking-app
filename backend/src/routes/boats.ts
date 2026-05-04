@@ -1,40 +1,27 @@
-import { Router, Request, Response } from 'express'
-import { PrismaClient } from '@prisma/client'
+import express, { Request, Response } from 'express'
 
-const router = Router()
-const prisma = new PrismaClient()
+const router = express.Router()
+
+// Mock data
+const boats = [
+  { id: '1', name: 'MS Neptune', imoNumber: '1234567890', capacityKg: 50000, portDeparture: 'Port of LA', portArrival: 'Port of Rotterdam', status: 'disponible' },
+  { id: '2', name: 'MS Atlantis', imoNumber: '0987654321', capacityKg: 45000, portDeparture: 'Port of Singapore', portArrival: 'Port of Hamburg', status: 'en_mer' }
+]
 
 // GET all boats
-router.get('/', async (req: Request, res: Response) => {
-  try {
-    const status = req.query.status as string | undefined
-    const boats = await prisma.boat.findMany({
-      where: status ? { status } : undefined,
-      orderBy: { createdAt: 'desc' }
-    })
-    res.json(boats)
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch boats' })
-  }
+router.get('/', (req: Request, res: Response) => {
+  res.json(boats)
 })
 
-// GET single boat
-router.get('/:id', async (req: Request, res: Response) => {
-  try {
-    const boat = await prisma.boat.findUnique({
-      where: { id: req.params.id }
-    })
-    if (!boat) {
-      return res.status(404).json({ error: 'Boat not found' })
-    }
-    res.json(boat)
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch boat' })
-  }
+// GET boat by ID
+router.get('/:id', (req: Request, res: Response) => {
+  const boat = boats.find(b => b.id === req.params.id)
+  if (!boat) return res.status(404).json({ error: 'Boat not found' })
+  res.json(boat)
 })
 
 // POST create boat
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', (req: Request, res: Response) => {
   try {
     const { name, imoNumber, capacityKg, portDeparture, portArrival } = req.body
 
@@ -42,74 +29,49 @@ router.post('/', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Missing required fields' })
     }
 
-    const boat = await prisma.boat.create({
-      data: {
-        name,
-        imoNumber,
-        capacityKg: parseInt(capacityKg),
-        portDeparture,
-        portArrival,
-        status: 'en_equipement'
-      }
-    })
-
-    res.status(201).json(boat)
-  } catch (error: any) {
-    if (error.code === 'P2002') {
-      return res.status(400).json({ error: 'Boat with this IMO already exists' })
+    const newBoat = {
+      id: String(boats.length + 1),
+      name,
+      imoNumber,
+      capacityKg: Number(capacityKg),
+      portDeparture: portDeparture || '',
+      portArrival: portArrival || '',
+      status: 'disponible'
     }
-    res.status(500).json({ error: 'Failed to create boat' })
+
+    boats.push(newBoat)
+    res.status(201).json(newBoat)
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' })
   }
 })
 
 // PUT update boat
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', (req: Request, res: Response) => {
   try {
-    const { name, capacityKg, portDeparture, portArrival } = req.body
+    const boat = boats.find(b => b.id === req.params.id)
+    if (!boat) return res.status(404).json({ error: 'Boat not found' })
 
-    const boat = await prisma.boat.update({
-      where: { id: req.params.id },
-      data: {
-        ...(name && { name }),
-        ...(capacityKg && { capacityKg: parseInt(capacityKg) }),
-        ...(portDeparture && { portDeparture }),
-        ...(portArrival && { portArrival })
-      }
-    })
+    const updated = { ...boat, ...req.body }
+    const index = boats.findIndex(b => b.id === req.params.id)
+    boats[index] = updated
 
-    res.json(boat)
-  } catch (error: any) {
-    if (error.code === 'P2025') {
-      return res.status(404).json({ error: 'Boat not found' })
-    }
-    res.status(500).json({ error: 'Failed to update boat' })
+    res.json(updated)
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' })
   }
 })
 
 // DELETE boat
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', (req: Request, res: Response) => {
   try {
-    const expeditions = await prisma.expedition.findMany({
-      where: {
-        boatId: req.params.id,
-        status: { not: 'livrée' }
-      }
-    })
+    const index = boats.findIndex(b => b.id === req.params.id)
+    if (index === -1) return res.status(404).json({ error: 'Boat not found' })
 
-    if (expeditions.length > 0) {
-      return res.status(400).json({ error: 'Cannot delete boat with active expeditions' })
-    }
-
-    await prisma.boat.delete({
-      where: { id: req.params.id }
-    })
-
-    res.json({ success: true })
-  } catch (error: any) {
-    if (error.code === 'P2025') {
-      return res.status(404).json({ error: 'Boat not found' })
-    }
-    res.status(500).json({ error: 'Failed to delete boat' })
+    const deleted = boats.splice(index, 1)
+    res.json(deleted[0])
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' })
   }
 })
 

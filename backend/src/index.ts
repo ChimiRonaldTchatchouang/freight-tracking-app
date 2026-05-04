@@ -18,22 +18,52 @@ app.use(express.json())
 
 // Health check
 app.get('/health', (req: Request, res: Response) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() })
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    message: 'Backend is running!'
+  })
 })
 
-// Routes placeholder
+// Auth routes
+app.use('/api/v1/auth', require('./routes/auth').default)
+
+// Boats routes
 app.use('/api/v1/boats', require('./routes/boats').default)
+
+// Vehicles routes
 app.use('/api/v1/vehicles', require('./routes/vehicles').default)
 
-// Error handling
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error(err)
-  res.status(500).json({ error: 'Internal server error' })
+// Default routes for testing
+app.get('/', (req: Request, res: Response) => {
+  res.json({ 
+    message: 'Freight Tracking API',
+    version: '1.0.0',
+    endpoints: {
+      health: '/health',
+      auth: '/api/v1/auth/login',
+      boats: '/api/v1/boats',
+      vehicles: '/api/v1/vehicles'
+    }
+  })
 })
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`)
+// 404 handler
+app.use((req: Request, res: Response) => {
+  res.status(404).json({ error: 'Route not found' })
+})
+
+// Error handling middleware
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('Error:', err)
+  res.status(500).json({ error: 'Internal server error', message: err.message })
+})
+
+const server = app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`)
   console.log(`📍 Health check: http://localhost:${PORT}/health`)
+  console.log(`🔐 Login: POST http://localhost:${PORT}/api/v1/auth/login`)
+  console.log(`✅ API is ready!`)
 })
 
 export default app

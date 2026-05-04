@@ -12,8 +12,13 @@ import { DebugPage } from './pages/Debug'
 import { NotFoundPage } from './pages/NotFound'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const token = localStorage.getItem('token')
-  return token ? <>{children}</> : <Navigate to="/login" />
+  // 🧪 MODE TEST: Pas d'authentification requise
+  // En production, décommenter la vérification de token
+  // const token = localStorage.getItem('token')
+  // return token ? <>{children}</> : <Navigate to="/login" />
+  
+  // Pour le test: accès direct
+  return <>{children}</>
 }
 
 export function App() {

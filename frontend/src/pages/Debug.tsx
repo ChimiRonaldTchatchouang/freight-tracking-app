@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { Card } from '../components/Card'
-import { Alert } from '../components/Alert'
 
 export function DebugPage() {
   const [apiUrl, setApiUrl] = useState('')
@@ -21,20 +20,20 @@ export function DebugPage() {
     } else {
       setHealthStatus('error')
       setHealthMessage('VITE_API_URL not configured!')
-      setLoginStatus('error')
+      setLoginTest('error')
       setLoginMessage('VITE_API_URL not configured!')
     }
   }, [])
 
   const testHealth = async (url: string) => {
     try {
-      const response = await fetch(`${url}/health`, { 
+      const response = await fetch(`${url}/health`, {
         headers: { 'Content-Type': 'application/json' }
       })
       if (response.ok) {
         const data = await response.json()
         setHealthStatus('ok')
-        setHealthMessage(`✓ Backend is healthy: ${JSON.stringify(data)}`)
+        setHealthMessage(`✓ Backend is healthy: ${JSON.stringify(data.status)}`)
       } else {
         setHealthStatus('error')
         setHealthMessage(`✗ Server returned ${response.status}`)
@@ -60,7 +59,7 @@ export function DebugPage() {
 
       if (response.ok && data.token) {
         setLoginTest('ok')
-        setLoginMessage(`✓ Login successful! Token: ${data.token.substring(0, 20)}...`)
+        setLoginMessage(`✓ Login successful! Token received.`)
       } else {
         setLoginTest('error')
         setLoginMessage(`✗ Login failed: ${data.error || 'Unknown error'}`)
@@ -68,6 +67,17 @@ export function DebugPage() {
     } catch (error: any) {
       setLoginTest('error')
       setLoginMessage(`✗ Error: ${error.message}`)
+    }
+  }
+
+  const getStatusColor = (status: 'checking' | 'ok' | 'error') => {
+    switch (status) {
+      case 'ok':
+        return 'bg-green-50 text-green-800 border-green-200'
+      case 'error':
+        return 'bg-red-50 text-red-800 border-red-200'
+      default:
+        return 'bg-yellow-50 text-yellow-800 border-yellow-200'
     }
   }
 
@@ -80,7 +90,7 @@ export function DebugPage() {
         <div className="space-y-2 bg-gray-50 p-4 rounded font-mono text-sm">
           <p>
             <span className="text-gray-600">VITE_API_URL:</span>{' '}
-            <span className={apiUrl === 'NOT SET' ? 'text-red-600' : 'text-green-600'}>
+            <span className={apiUrl === 'NOT SET' ? 'text-red-600 font-bold' : 'text-green-600'}>
               {apiUrl}
             </span>
           </p>
@@ -94,8 +104,8 @@ export function DebugPage() {
       <Card className="mb-6">
         <h2 className="text-xl font-bold mb-4">Health Check</h2>
         <div className="space-y-2">
-          <p>Testing: {apiUrl}/health</p>
-          <div className={`p-3 rounded ${healthStatus === 'ok' ? 'bg-green-50 text-green-800' : healthStatus === 'checking' ? 'bg-yellow-50 text-yellow-800' : 'bg-red-50 text-red-800'}`}>
+          <p className="text-sm text-gray-600">Testing: {apiUrl}/health</p>
+          <div className={`p-3 rounded border ${getStatusColor(healthStatus)}`}>
             {healthStatus === 'checking' ? '⏳ Checking...' : healthMessage}
           </div>
         </div>
@@ -104,8 +114,8 @@ export function DebugPage() {
       <Card className="mb-6">
         <h2 className="text-xl font-bold mb-4">Login Test</h2>
         <div className="space-y-2">
-          <p>Testing: {apiUrl}/api/v1/auth/login</p>
-          <div className={`p-3 rounded ${loginTest === 'ok' ? 'bg-green-50 text-green-800' : loginTest === 'checking' ? 'bg-yellow-50 text-yellow-800' : 'bg-red-50 text-red-800'}`}>
+          <p className="text-sm text-gray-600">Testing: {apiUrl}/api/v1/auth/login</p>
+          <div className={`p-3 rounded border ${getStatusColor(loginTest)}`}>
             {loginTest === 'checking' ? '⏳ Checking...' : loginMessage}
           </div>
         </div>
@@ -115,21 +125,31 @@ export function DebugPage() {
         <h2 className="text-xl font-bold mb-4">⚠️ Troubleshooting</h2>
         <div className="space-y-2 text-sm">
           {apiUrl === 'NOT SET' && (
-            <Alert type="error" title="VITE_API_URL NOT SET" message="Configure VITE_API_URL in Vercel settings" />
+            <div className="p-3 rounded bg-red-50 border border-red-200 text-red-800">
+              <p className="font-bold">❌ VITE_API_URL NOT SET</p>
+              <p>Configure VITE_API_URL in Vercel settings</p>
+            </div>
           )}
-          {healthStatus === 'error' && (
-            <>
-              <Alert type="error" title="Backend Not Accessible" message="Backend is not running or URL is wrong" />
-              <p className="text-xs text-gray-600">✓ Deploy backend on Railway</p>
-              <p className="text-xs text-gray-600">✓ Get the Railway URL</p>
-              <p className="text-xs text-gray-600">✓ Set VITE_API_URL in Vercel</p>
-            </>
+          {healthStatus === 'error' && apiUrl !== 'NOT SET' && (
+            <div className="p-3 rounded bg-red-50 border border-red-200 text-red-800">
+              <p className="font-bold">❌ Backend Not Accessible</p>
+              <p>Backend is not running or URL is wrong</p>
+              <p className="text-xs mt-2">✓ Deploy backend on Railway</p>
+              <p className="text-xs">✓ Get the Railway URL</p>
+              <p className="text-xs">✓ Set VITE_API_URL in Vercel</p>
+            </div>
           )}
-          {loginTest === 'error' && (
-            <Alert type="error" title="Login Failed" message="Check backend logs for details" />
+          {loginTest === 'error' && healthStatus === 'ok' && (
+            <div className="p-3 rounded bg-red-50 border border-red-200 text-red-800">
+              <p className="font-bold">❌ Login Failed</p>
+              <p>Check backend logs for details</p>
+            </div>
           )}
-          {loginTest === 'ok' && healthStatus === 'ok' && (
-            <Alert type="success" title="Everything Works!" message="You can now close this debug page and login normally" />
+          {loginTest === 'ok' && healthStatus === 'ok' && apiUrl !== 'NOT SET' && (
+            <div className="p-3 rounded bg-green-50 border border-green-200 text-green-800">
+              <p className="font-bold">✅ Everything Works!</p>
+              <p>You can now close this debug page and login normally</p>
+            </div>
           )}
         </div>
       </Card>

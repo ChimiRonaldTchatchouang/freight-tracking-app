@@ -2,4 +2,3 @@ Flask==2.3.2
 Flask-CORS==4.0.0
 Gunicorn==21.2.0
 Werkzeug==2.3.6
-sign-language-translator==0.8.1

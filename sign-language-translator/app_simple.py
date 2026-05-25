@@ -268,6 +268,7 @@ hr{border:none;border-top:2px solid #f0f0f0;margin:1.25rem 0}
         <button class="cb cb-stop" id="btnStop"  onclick="stopCam()">■ Arrêter</button>
         <button class="cb cb-cl"   onclick="clearSent()">✕ Effacer</button>
       </div>
+      <button onclick="speakSentence()" style="width:100%;padding:.65rem;border:none;border-radius:8px;background:#f0eeff;color:#667eea;font-weight:700;font-size:13px;cursor:pointer;border:1.5px solid #d4caf0;margin-bottom:.75rem">🔊 Lire la phrase à voix haute</button>
 
       <h3 style="margin-bottom:.5rem">Signes reconnus</h3>
       <div class="ref-grid" id="refGrid"></div>
@@ -447,6 +448,14 @@ function toggleDebug() {
 }
 
 async function startCam() {
+  // Unlock speech synthesis SYNCHRONOUSLY inside user gesture (required by iOS)
+  try {
+    const u = new SpeechSynthesisUtterance(' ');
+    u.volume = 0.01; u.lang = 'fr-FR';
+    speechSynthesis.speak(u);
+    setTimeout(() => speechSynthesis.cancel(), 100);
+  } catch(_) {}
+
   document.getElementById('btnStart').style.display = 'none';
   document.getElementById('btnStop').style.display  = 'block';
   document.getElementById('liveConf').textContent = 'Accès caméra…';
@@ -513,21 +522,18 @@ async function startCam() {
     }
   });
 
-  // Use RAF instead of Camera class — works on all mobile browsers
+  // RAF loop — schedule FIRST then process (never await send on iOS)
   running = true;
   let lastTs = 0;
-  const TARGET_FPS = 20; // cap at 20 fps — enough for detection, saves battery
-  const FRAME_MS = 1000 / TARGET_FPS;
+  const FRAME_MS = 1000 / 20; // 20 fps
 
-  async function loop(ts) {
+  function loop(ts) {
     if (!running) return;
-    if (ts - lastTs >= FRAME_MS) {
+    rafId = requestAnimationFrame(loop); // schedule immediately, no blocking
+    if (ts - lastTs >= FRAME_MS && vid.readyState >= 2) {
       lastTs = ts;
-      if (vid.readyState >= 2) { // HAVE_CURRENT_DATA
-        try { await mpH.send({ image: vid }); } catch(_) {}
-      }
+      mpH.send({ image: vid }); // fire-and-forget — onResults called async
     }
-    rafId = requestAnimationFrame(loop);
   }
   rafId = requestAnimationFrame(loop);
   document.getElementById('liveConf').textContent = '✅ Actif — montrez un signe !';
@@ -616,21 +622,36 @@ function clearSent() {
 
 // ── Synthèse vocale française ────────────────────────────────────
 let ttsVoice = null;
+let speechUnlocked = false;
+
 function initVoices() {
   const voices = speechSynthesis.getVoices();
-  // Prefer French voice
-  ttsVoice = voices.find(v => v.lang.startsWith('fr')) || voices[0] || null;
+  ttsVoice = voices.find(v => v.lang === 'fr-FR')
+          || voices.find(v => v.lang.startsWith('fr'))
+          || voices[0] || null;
 }
 speechSynthesis.onvoiceschanged = initVoices;
-initVoices();
+setTimeout(initVoices, 500); // iOS loads voices asynchronously
 
 function speakFR(text) {
   if (!window.speechSynthesis) return;
-  speechSynthesis.cancel(); // stop any ongoing speech
+  speechSynthesis.cancel();
   const utt = new SpeechSynthesisUtterance(text);
   utt.lang = 'fr-FR';
-  utt.rate = 0.95;
+  utt.rate = 0.9;
   utt.pitch = 1;
+  utt.volume = 1;
+  if (ttsVoice) utt.voice = ttsVoice;
+  speechSynthesis.speak(utt);
+}
+
+// Bouton de secours — toujours déclenché par geste utilisateur (iOS safe)
+function speakSentence() {
+  if (!sentence.length) return;
+  speechSynthesis.cancel();
+  const utt = new SpeechSynthesisUtterance(sentence.join(', '));
+  utt.lang = 'fr-FR';
+  utt.rate = 0.85;
   if (ttsVoice) utt.voice = ttsVoice;
   speechSynthesis.speak(utt);
 }

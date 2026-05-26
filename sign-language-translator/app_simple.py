@@ -531,7 +531,7 @@ async function startCam() {
   document.getElementById('liveConf').textContent = 'Chargement modèle IA…';
 
   mpH = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
-  mpH.setOptions({ maxNumHands:2, modelComplexity:0, minDetectionConfidence:.6, minTrackingConfidence:.5 });
+  mpH.setOptions({ maxNumHands:2, modelComplexity:0, minDetectionConfidence:.55, minTrackingConfidence:.4 });
 
   mpH.onResults(res => {
     ctx.clearRect(0, 0, cvs.width, cvs.height);

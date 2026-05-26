@@ -368,35 +368,14 @@ const SIGNS = [
   { key:'APPELER', emoji:'🤙', fr:'APPELER',       en:'Call Me',     fingers:[0,0,0,0,1], thumbNeeded:true,  desc:'Pouce + Auriculaire levés (Y)' },
   { key:'ROCK',    emoji:'🤘', fr:'ROCK',          en:'Rock',        fingers:[0,1,0,0,1], thumbNeeded:false, desc:'Index + Auriculaire levés' },
   { key:'OK',      emoji:'👌', fr:'OK',            en:'OK',          fingers:[0,0,1,1,1], thumbNeeded:true,  desc:'Pouce + Annulaire + Auriculaire' },
-  // Signes à deux mains
-  { key:'APPLAUDIR', emoji:'👏', fr:'APPLAUDIR',   en:'Applause',  hands:2, symmetric:true,
-    hand1:{ fingers:[1,1,1,1] }, hand2:{ fingers:[1,1,1,1] },
-    desc:'Deux mains ouvertes' },
-  { key:'MAISON',   emoji:'🏠', fr:'MAISON',       en:'Home',      hands:2, symmetric:true,
-    hand1:{ fingers:[1,1,0,0], thumbNeeded:false }, hand2:{ fingers:[1,1,0,0], thumbNeeded:false },
-    desc:'Deux mains index+majeur (toit)' },
-  { key:'ENSEMBLE', emoji:'🤝', fr:'ENSEMBLE',     en:'Together',  hands:2, symmetric:true,
-    hand1:{ fingers:[0,0,0,0], thumbNeeded:true, thumbDir:'up' },
-    hand2:{ fingers:[0,0,0,0], thumbNeeded:true, thumbDir:'up' },
-    desc:'Deux pouces levés' },
-  { key:'VOITURE',  emoji:'🚗', fr:'VOITURE',      en:'Car',       hands:2, symmetric:true,
-    hand1:{ fingers:[0,0,0,0], thumbNeeded:false }, hand2:{ fingers:[0,0,0,0], thumbNeeded:false },
-    desc:'Deux poings fermés (volant)' },
-  { key:'AIDER',    emoji:'🙌', fr:'AIDER',        en:'Help',      hands:2, symmetric:true,
-    hand1:{ fingers:[1,1,1,1] }, hand2:{ fingers:[0,0,0,0], thumbNeeded:false },
-    desc:'Une main ouverte + une main fermée' },
-  { key:'PARLER',   emoji:'💬', fr:'PARLER',       en:'Talk',      hands:2, symmetric:true,
-    hand1:{ fingers:[1,0,0,0], thumbNeeded:false }, hand2:{ fingers:[1,0,0,0], thumbNeeded:false },
-    desc:'Deux index pointés' },
 ];
 
 function buildRefGrid() {
   const g = document.getElementById('refGrid');
   SIGNS.forEach(s => {
-    const badge = s.hands === 2 ? ' <span style="font-size:8px;background:#764ba2;color:#fff;border-radius:3px;padding:1px 3px">2M</span>' : '';
     g.innerHTML += `<div class="ref-item">
       <span class="ref-emoji">${s.emoji}</span>
-      <span class="ref-label">${s.fr}${badge}</span>
+      <span class="ref-label">${s.fr}</span>
       <span class="ref-desc">${s.desc}</span>
     </div>`;
   });
@@ -426,45 +405,19 @@ function getStates(lm) {
   return { thumb, thumbUp, thumbDown, index, middle, ring, pinky, palmSz, thumbDist };
 }
 
-// Match a single hand's finger state against a two-hand sign slot pattern
-function matchHand(f, pat) {
-  const fi = [f.index, f.middle, f.ring, f.pinky];
-  for (let i = 0; i < 4; i++) {
-    if (pat.fingers[i] === 1 && !fi[i]) return false;
-    if (pat.fingers[i] === 0 && fi[i])  return false;
-  }
-  if (pat.thumbNeeded !== undefined) {
-    if (pat.thumbNeeded  && !f.thumb) return false;
-    if (!pat.thumbNeeded &&  f.thumb) return false;
-  }
-  if (pat.thumbDir === 'up'   && !f.thumbUp)   return false;
-  if (pat.thumbDir === 'down' && !f.thumbDown) return false;
-  return true;
-}
+function classify(lm) {
+  const f = getStates(lm);
+  const fi = [f.index, f.middle, f.ring, f.pinky]; // 4 finger states
 
-function classify(lm1, lm2) {
-  // Two-hand signs: checked first when both hands are visible
-  if (lm2) {
-    const f1 = getStates(lm1), f2 = getStates(lm2);
-    for (const s of SIGNS) {
-      if (s.hands !== 2) continue;
-      if (matchHand(f1, s.hand1) && matchHand(f2, s.hand2)) return { sign: s, conf: 85 };
-      if (s.symmetric && matchHand(f1, s.hand2) && matchHand(f2, s.hand1)) return { sign: s, conf: 85 };
-    }
-  }
-
-  // Single-hand classification on dominant (first) hand
-  const f = getStates(lm1);
-  const fi = [f.index, f.middle, f.ring, f.pinky];
-
+  // Helper: match finger pattern (1=must be up, 0=must be down, -1=any)
   function match(pat, needThumb, thumbDir) {
-    for (let i = 0; i < 4; i++) {
-      if (pat[i] === 1 && !fi[i]) return false;
-      if (pat[i] === 0 && fi[i])  return false;
+    for (let i=0; i<4; i++) {
+      if (pat[i]===1 && !fi[i]) return false;
+      if (pat[i]===0 && fi[i])  return false;
     }
     if (needThumb !== undefined) {
-      if (needThumb  && !f.thumb) return false;
-      if (!needThumb &&  f.thumb) return false;
+      if (needThumb && !f.thumb) return false;
+      if (!needThumb && f.thumb) return false;
     }
     if (thumbDir === 'up'   && !f.thumbUp)   return false;
     if (thumbDir === 'down' && !f.thumbDown) return false;
@@ -472,11 +425,12 @@ function classify(lm1, lm2) {
   }
 
   for (const s of SIGNS) {
-    if (s.hands === 2) continue;
-    const pat = s.fingers;
-    const p4 = pat.length === 5 ? pat.slice(1) : pat;
+    const pat = s.fingers; // may have 4 or 5 values
+    const p4 = pat.length === 5 ? pat.slice(1) : pat; // use last 4 for fingers
     const needThumb = pat.length === 5 ? !!pat[0] : s.thumbNeeded;
-    if (match(p4, needThumb, s.thumbDir)) return { sign: s, conf: 82 };
+    if (match(p4, needThumb, s.thumbDir)) {
+      return { sign: s, conf: 82 };
+    }
   }
   return { sign: null, conf: 0 };
 }
@@ -532,24 +486,21 @@ async function startCam() {
   document.getElementById('liveConf').textContent = 'Chargement modèle IA…';
 
   mpH = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
-  mpH.setOptions({ maxNumHands:2, modelComplexity:0, minDetectionConfidence:.55, minTrackingConfidence:.4 });
+  mpH.setOptions({ maxNumHands:1, modelComplexity:0, minDetectionConfidence:.55, minTrackingConfidence:.4 });
 
   mpH.onResults(res => {
     ctx.clearRect(0, 0, cvs.width, cvs.height);
-    const hands = res.multiHandLandmarks || [];
-    hands.forEach(lm => {
+    if (res.multiHandLandmarks?.length) {
+      const lm = res.multiHandLandmarks[0];
       drawConnectors(ctx, lm, HAND_CONNECTIONS, { color:'#667eea', lineWidth:2 });
       drawLandmarks(ctx,  lm, { color:'#fff', fillColor:'#764ba2', radius:3 });
-    });
 
-    const lm1 = hands[0] || null;
-    const lm2 = hands[1] || null;
-    if (lm1) {
-      const { sign, conf } = classify(lm1, lm2);
+      const { sign, conf } = classify(lm);
+
       if (debugOn) {
-        const f = getStates(lm1);
+        const f = getStates(lm);
         document.getElementById('dbg').innerHTML =
-          `Mains:${hands.length} T:${+f.thumb} I:${+f.index} M:${+f.middle} R:${+f.ring} P:${+f.pinky}<br>`+
+          `T:${+f.thumb} I:${+f.index} M:${+f.middle} R:${+f.ring} P:${+f.pinky}<br>`+
           `thumbUp:${+f.thumbUp} dn:${+f.thumbDown}<br>`+
           `thumbDist:${f.thumbDist.toFixed(3)} palm:${f.palmSz.toFixed(3)}<br>`+
           `→ ${sign ? sign.fr : '—'}`;

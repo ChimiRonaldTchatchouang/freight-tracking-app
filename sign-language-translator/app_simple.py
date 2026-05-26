@@ -443,16 +443,18 @@ function classify(lm) {
   const f = getStates(lm);
   const fi = [f.index, f.middle, f.ring, f.pinky]; // 4 finger states
 
-  // Helper: match finger pattern (1=must be up, 0=must be down, -1=any)
+  // Helper: match finger pattern
+  // needThumb=true  → pouce REQUIS  (si absent → échec)
+  // needThumb=false → pouce IGNORÉ  (présent ou absent, ça passe)
+  // Grâce à l'ordre du tableau, les signes T=true sont testés en premier ;
+  // ils captent les gestes avec pouce, les T=false servent de fallback.
   function match(pat, needThumb, thumbDir) {
     for (let i=0; i<4; i++) {
       if (pat[i]===1 && !fi[i]) return false;
       if (pat[i]===0 && fi[i])  return false;
     }
-    if (needThumb !== undefined) {
-      if (needThumb && !f.thumb) return false;
-      if (!needThumb && f.thumb) return false;
-    }
+    if (needThumb === true && !f.thumb) return false; // pouce absent mais requis
+    // si needThumb=false : on ne rejette PAS si le pouce dépasse légèrement
     if (thumbDir === 'up'   && !f.thumbUp)   return false;
     if (thumbDir === 'down' && !f.thumbDown) return false;
     return true;

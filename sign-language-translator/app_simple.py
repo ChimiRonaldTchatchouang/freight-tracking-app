@@ -24,14 +24,6 @@ SIGN_MAP = {
     'vais':'FUTURE','manger':'EAT','veux':'WANT','aller':'GO',
     'pomme':'APPLE','demain':'TOMORROW','bonjour':'HI','merci':'THANK',
     'oui':'YES','non':'NO','bon':'GOOD','eau':'WATER',
-    'triste':'SAD','sad':'SAD','heureux':'HAPPY','happy':'HAPPY',
-    'content':'HAPPY','joyeux':'HAPPY',
-    'parler':'SPEAK','speak':'SPEAK','talk':'SPEAK','dire':'SPEAK',
-    'comprendre':'UNDERSTAND','understand':'UNDERSTAND',
-    "aujourd'hui":'TODAY','aujourd':'TODAY',
-    'famille':'FAMILY','family':'FAMILY',
-    'aider':'HELP','maison':'HOME',
-    'arreter':'STOP','arrêter':'STOP',
 }
 SKIP = {
     'a','an','the','is','are','was','were','be','been','to','of','in','on',
@@ -53,14 +45,6 @@ SIGN_DESC = {
     'LOVE':{'handshape':'Bras croisés poings','location':'Poitrine','movement':'Croiser les bras'},
     'GOOD':{'handshape':'Main ouverte paume haut','location':'Menton','movement':'Avancer dans l\'autre paume'},
     'EAT':{'handshape':'Main-O plate','location':'Bouche','movement':'Toucher les doigts à la bouche'},
-    'STOP':{'handshape':'Main plate','location':'Paume de l\'autre main','movement':'Chopper brusquement la paume'},
-    'HOME':{'handshape':'Main plate B','location':'Joue puis menton','movement':'Toucher joue → puis menton'},
-    'HELP':{'handshape':'Poing A sur paume ouverte','location':'Devant soi','movement':'Lever la main de support'},
-    'SAD':{'handshape':'5 doigts courbés','location':'Devant le visage','movement':'Glisser les deux mains vers le bas'},
-    'HAPPY':{'handshape':'Main ouverte paume vers soi','location':'Poitrine','movement':'Mouvements circulaires vers le haut'},
-    'SPEAK':{'handshape':'Index pointé','location':'Devant la bouche','movement':'Petits arcs vers l\'avant'},
-    'UNDERSTAND':{'handshape':'Index tendu','location':'Tempe','movement':'Claquer le doigt vers le haut'},
-    'FAMILY':{'handshape':'F-handshape (index+pouce)','location':'Devant soi','movement':'Cercle avec les deux mains'},
 }
 
 def translate_with_slt(text, language, target_sign):
@@ -110,6 +94,7 @@ HTML = r"""<!DOCTYPE html>
 <title>Traducteur LSF</title>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:linear-gradient(135deg,#667eea,#764ba2);min-height:100vh;padding:1.5rem}
@@ -182,7 +167,7 @@ hr{border:none;border-top:2px solid #f0f0f0;margin:1.25rem 0}
 .cb-cl{background:#f5f5f5;color:#555;border:1.5px solid #e0e0e0;flex:.55}
 
 /* Sign reference grid */
-.ref-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.35rem}
+.ref-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem}
 .ref-item{background:#f8f6ff;border:1.5px solid #e4dcf8;border-radius:8px;padding:.4rem .5rem;text-align:center;font-size:11px}
 .ref-emoji{font-size:18px;display:block;margin-bottom:2px}
 .ref-label{font-weight:700;color:#667eea;font-size:10px}
@@ -369,38 +354,20 @@ document.addEventListener('DOMContentLoaded',()=>{
    CAMERA SIGN RECOGNITION
 ═══════════════════════════════════════════════════════════════ */
 
-// ── Dictionnaire de signes LSF (25 signes) ─────────────────────
+// ── Sign dictionary (LSF-labelled) ─────────────────────────────
 const SIGNS = [
-  // ── Main entière ──────────────────────────────────────────────
-  { key:'BONJOUR',     emoji:'👋',  fr:'BONJOUR',       en:'Hello',      fingers:[1,1,1,1,1], desc:'Main ouverte, 5 doigts levés' },
-  // ── Pouce + plusieurs doigts ──────────────────────────────────
-  { key:'JE_TAIME',    emoji:'🤟',  fr:'JE T\'AIME',    en:'I Love You', fingers:[1,1,0,0,1], desc:'Pouce+Index+Auriculaire levés' },
-  { key:'APPELER',     emoji:'🤙',  fr:'APPELER',        en:'Call Me',    fingers:[1,0,0,0,1], desc:'Pouce+Auriculaire levés (Y)' },
-  { key:'MAISON',      emoji:'🏠',  fr:'MAISON',         en:'Home',       fingers:[1,1,1,1,0], desc:'Index+Majeur+Annulaire+Pouce (toit)' },
-  { key:'OK',          emoji:'👌',  fr:'OK',             en:'OK',         fingers:[1,0,1,1,1], desc:'Majeur+Annulaire+Auriculaire+Pouce' },
-  { key:'MERCI',       emoji:'🙏',  fr:'MERCI',          en:'Thank You',  fingers:[1,1,1,0,0], desc:'Index+Majeur+Pouce, depuis le menton' },
-  { key:'COMPRENDRE',  emoji:'💡',  fr:'COMPRENDRE',     en:'Understand', fingers:[1,0,0,1,1], desc:'Annulaire+Auriculaire+Pouce' },
-  { key:'ARRETER',     emoji:'🛑',  fr:'ARRÊTER',        en:'Stop',       fingers:[1,0,1,0,0], desc:'Majeur+Pouce levés (geste stop)' },
-  { key:'AUJHUI',      emoji:'📅',  fr:'AUJOURD\'HUI',  en:'Today',      fingers:[1,0,1,0,1], desc:'Majeur+Auriculaire+Pouce' },
-  { key:'AIDER',       emoji:'🤝',  fr:'AIDER',          en:'Help',       fingers:[1,0,0,0],   thumbNeeded:true, desc:'Index+Pouce levés (forme L)' },
-  // ── Direction du pouce (BIEN/MAUVAIS doivent précéder NON) ────
-  { key:'BIEN',        emoji:'👍',  fr:'BIEN',           en:'Good',       fingers:[1,0,0,0,0], thumbDir:'up',   desc:'Pouce levé, autres doigts fermés' },
-  { key:'MAUVAIS',     emoji:'👎',  fr:'MAUVAIS',        en:'Bad',        fingers:[1,0,0,0,0], thumbDir:'down', desc:'Pouce baissé, autres doigts fermés' },
-  { key:'NON',         emoji:'🚫',  fr:'NON',            en:'No',         fingers:[1,0,0,0,0], desc:'Poing fermé, pouce sur le côté (A)' },
-  // ── Poing fermé ───────────────────────────────────────────────
-  { key:'OUI',         emoji:'✊',  fr:'OUI',            en:'Yes',        fingers:[0,0,0,0,0], desc:'Poing fermé, tous les doigts pliés' },
-  // ── Doigts sans pouce ─────────────────────────────────────────
-  { key:'QUATRE',      emoji:'🖐',  fr:'QUATRE',         en:'Four',       fingers:[0,1,1,1,1], desc:'4 doigts levés, pouce fermé' },
-  { key:'TROIS',       emoji:'3️⃣', fr:'TROIS',          en:'Three',      fingers:[0,1,1,1,0], desc:'Index+Majeur+Annulaire levés' },
-  { key:'PAIX',        emoji:'✌️', fr:'PAIX / DEUX',    en:'Peace/Two',  fingers:[0,1,1,0,0], desc:'Index+Majeur levés (V de victoire)' },
-  { key:'PARLER',      emoji:'💬',  fr:'PARLER',         en:'Speak',      fingers:[0,1,0,1,1], desc:'Index+Annulaire+Auriculaire levés' },
-  { key:'TRISTE',      emoji:'😢',  fr:'TRISTE',         en:'Sad',        fingers:[0,0,1,1,1], desc:'Majeur+Annulaire+Auriculaire levés' },
-  { key:'FAMILLE',     emoji:'👪', fr:'FAMILLE',   en:'Family',     fingers:[0,0,1,1,0], desc:'Majeur+Annulaire levés (F approx.)' },
-  { key:'HEUREUX',     emoji:'😊',  fr:'HEUREUX',        en:'Happy',      fingers:[0,1,0,1,0], desc:'Index+Annulaire levés, écartés' },
-  { key:'MANGER',      emoji:'🍴', fr:'MANGER',   en:'Eat',        fingers:[0,0,1,0,1], desc:'Majeur+Auriculaire levés' },
-  { key:'ROCK',        emoji:'🤘',  fr:'ROCK',           en:'Rock',       fingers:[0,1,0,0,1], desc:'Index+Auriculaire levés' },
-  { key:'EAU',         emoji:'💧',  fr:'EAU',            en:'Water',      fingers:[0,0,0,1,1], desc:'Annulaire+Auriculaire levés' },
-  { key:'UN',          emoji:'☝️', fr:'UN',             en:'One',        fingers:[0,1,0,0,0], desc:'Seulement l\'index levé' },
+  { key:'BONJOUR', emoji:'👋', fr:'BONJOUR',      en:'Hello',       fingers:[1,1,1,1,1], thumbNeeded:true,  desc:'Main ouverte, 5 doigts levés' },
+  { key:'OUI',     emoji:'✊', fr:'OUI',           en:'Yes',         fingers:[0,0,0,0,0], thumbNeeded:false, desc:'Poing fermé, tous les doigts pliés' },
+  { key:'BIEN',    emoji:'👍', fr:'BIEN',          en:'Good',        fingers:[0,0,0,0,0], thumbNeeded:true, thumbDir:'up', desc:'Pouce levé, autres doigts fermés' },
+  { key:'MAUVAIS', emoji:'👎', fr:'MAUVAIS',       en:'Bad',         fingers:[0,0,0,0,0], thumbNeeded:true, thumbDir:'down', desc:'Pouce baissé, autres doigts fermés' },
+  { key:'JE_TAIME',emoji:'🤟', fr:'JE T\'AIME',   en:'I Love You',  fingers:[1,0,0,1], thumbNeeded:true, desc:'Pouce + Index + Auriculaire levés' },
+  { key:'PAIX',    emoji:'✌️', fr:'PAIX / DEUX',  en:'Peace / Two', fingers:[0,1,1,0,0], thumbNeeded:false, desc:'Index + Majeur levés (V)' },
+  { key:'UN',      emoji:'☝️', fr:'UN',            en:'One',         fingers:[0,1,0,0,0], thumbNeeded:false, desc:'Seulement l\'index levé' },
+  { key:'TROIS',   emoji:'3️⃣', fr:'TROIS',        en:'Three',       fingers:[0,1,1,1,0], thumbNeeded:false, desc:'Index + Majeur + Annulaire' },
+  { key:'QUATRE',  emoji:'🖐', fr:'QUATRE',        en:'Four',        fingers:[0,1,1,1,1], thumbNeeded:false, desc:'4 doigts levés, pouce fermé' },
+  { key:'APPELER', emoji:'🤙', fr:'APPELER',       en:'Call Me',     fingers:[0,0,0,0,1], thumbNeeded:true,  desc:'Pouce + Auriculaire levés (Y)' },
+  { key:'ROCK',    emoji:'🤘', fr:'ROCK',          en:'Rock',        fingers:[0,1,0,0,1], thumbNeeded:false, desc:'Index + Auriculaire levés' },
+  { key:'OK',      emoji:'👌', fr:'OK',            en:'OK',          fingers:[0,0,1,1,1], thumbNeeded:true,  desc:'Pouce + Annulaire + Auriculaire' },
 ];
 
 function buildRefGrid() {
@@ -442,18 +409,16 @@ function classify(lm) {
   const f = getStates(lm);
   const fi = [f.index, f.middle, f.ring, f.pinky]; // 4 finger states
 
-  // Helper: match finger pattern
-  // needThumb=true  → pouce REQUIS  (si absent → échec)
-  // needThumb=false → pouce IGNORÉ  (présent ou absent, ça passe)
-  // Grâce à l'ordre du tableau, les signes T=true sont testés en premier ;
-  // ils captent les gestes avec pouce, les T=false servent de fallback.
+  // Helper: match finger pattern (1=must be up, 0=must be down, -1=any)
   function match(pat, needThumb, thumbDir) {
     for (let i=0; i<4; i++) {
       if (pat[i]===1 && !fi[i]) return false;
       if (pat[i]===0 && fi[i])  return false;
     }
-    if (needThumb === true && !f.thumb) return false; // pouce absent mais requis
-    // si needThumb=false : on ne rejette PAS si le pouce dépasse légèrement
+    if (needThumb !== undefined) {
+      if (needThumb && !f.thumb) return false;
+      if (!needThumb && f.thumb) return false;
+    }
     if (thumbDir === 'up'   && !f.thumbUp)   return false;
     if (thumbDir === 'down' && !f.thumbDown) return false;
     return true;
@@ -525,42 +490,22 @@ async function startCam() {
   setSize();
   vid.addEventListener('resize', setSize);
 
-  const confEl = document.getElementById('liveConf');
-  confEl.textContent = 'Chargement modèle IA…';
+  document.getElementById('liveConf').textContent = 'Chargement modèle IA…';
 
-  // Vérifier que MediaPipe est chargé
-  if (typeof Hands === 'undefined') {
-    confEl.textContent = 'ERREUR: MediaPipe non charge. Verifiez connexion internet.';
-    resetUI(); return;
-  }
-
-  try {
-    mpH = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
-  } catch(e) {
-    confEl.textContent = 'ERREUR init MediaPipe: ' + e.message;
-    resetUI(); return;
-  }
-
+  mpH = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
   mpH.setOptions({
     maxNumHands: 1,
-    modelComplexity: 0,
+    modelComplexity: 0,           // Fastest — essential for mobile
     minDetectionConfidence: 0.5,
     minTrackingConfidence: 0.4
   });
 
-  let firstResult = false;
   mpH.onResults(res => {
-    if (!firstResult) {
-      firstResult = true;
-      confEl.textContent = 'Modele charge — montrez votre main !';
-    }
     ctx.clearRect(0, 0, cvs.width, cvs.height);
-    if (res.multiHandLandmarks && res.multiHandLandmarks.length > 0) {
+    if (res.multiHandLandmarks?.length) {
       const lm = res.multiHandLandmarks[0];
-      try {
-        drawConnectors(ctx, lm, HAND_CONNECTIONS, { color:'#667eea', lineWidth:2 });
-        drawLandmarks(ctx,  lm, { color:'#fff', fillColor:'#764ba2', radius:3 });
-      } catch(_) {}
+      drawConnectors(ctx, lm, HAND_CONNECTIONS, { color:'#667eea', lineWidth:2 });
+      drawLandmarks(ctx,  lm, { color:'#fff', fillColor:'#764ba2', radius:3 });
       const { sign, conf } = classify(lm);
       if (debugOn) {
         const f = getStates(lm);
@@ -568,12 +513,12 @@ async function startCam() {
           `T:${+f.thumb} I:${+f.index} M:${+f.middle} R:${+f.ring} P:${+f.pinky}<br>`+
           `tUp:${+f.thumbUp} tDn:${+f.thumbDown}<br>`+
           `tDist:${f.thumbDist.toFixed(3)} palm:${f.palmSz.toFixed(3)}<br>`+
-          `sign: ${sign ? sign.fr : 'none'}`;
+          `→ ${sign ? sign.fr : '—'}`;
       }
       onDetect(sign, conf);
     } else {
       onDetect(null, 0);
-      if (debugOn) document.getElementById('dbg').innerHTML = 'Aucune main detectee';
+      if (debugOn) document.getElementById('dbg').innerHTML = 'Aucune main';
     }
   });
 
@@ -582,23 +527,16 @@ async function startCam() {
   let lastTs = 0;
   const FRAME_MS = 1000 / 20; // 20 fps
 
-  // Timeout: si onResults n'a pas tiré après 15s → modèle WASM non chargé
-  const loadTimeout = setTimeout(() => {
-    if (!firstResult && running) {
-      confEl.textContent = 'Modele lent a charger... verifiez votre connexion internet.';
-    }
-  }, 15000);
-
   function loop(ts) {
     if (!running) return;
-    rafId = requestAnimationFrame(loop);
+    rafId = requestAnimationFrame(loop); // schedule immediately, no blocking
     if (ts - lastTs >= FRAME_MS && vid.readyState >= 2) {
       lastTs = ts;
-      try { mpH.send({ image: vid }); } catch(_) {}
+      mpH.send({ image: vid }); // fire-and-forget — onResults called async
     }
   }
   rafId = requestAnimationFrame(loop);
-  // NE PAS mettre ✅ ici — le message est mis dans onResults au premier résultat
+  document.getElementById('liveConf').textContent = '✅ Actif — montrez un signe !';
 }
 
 function stopCam() {

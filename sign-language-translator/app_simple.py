@@ -182,7 +182,7 @@ hr{border:none;border-top:2px solid #f0f0f0;margin:1.25rem 0}
 <body>
 <div class="app">
 <header>
-  <div><h1>🤟 Traducteur Langue des Signes <span style="font-size:11px;background:rgba(255,255,255,.25);border-radius:4px;padding:2px 7px;vertical-align:middle">v2 · 2M</span></h1><p style="font-size:12px;opacity:.8">Texte → Glosses LSF &nbsp;|&nbsp; Caméra → Mots en temps réel</p></div>
+  <div><h1>🤟 Traducteur Langue des Signes</h1><p style="font-size:12px;opacity:.8">Texte → Glosses LSF &nbsp;|&nbsp; Caméra → Mots en temps réel</p></div>
   <div class="tabs">
     <button class="tbtn active" onclick="switchTab('text',this)">📝 Texte</button>
     <button class="tbtn"        onclick="switchTab('cam',this)">📷 Caméra</button>
@@ -370,30 +370,14 @@ const SIGNS = [
   { key:'OK',      emoji:'👌', fr:'OK',            en:'OK',          fingers:[0,0,1,1,1], thumbNeeded:true,  desc:'Pouce + Annulaire + Auriculaire' },
 ];
 
-// ── Two-hand signs — separate array, does NOT touch SIGNS ───────
-const SIGNS_2H = [
-  { key:'APPLAUDIR', emoji:'👏', fr:'APPLAUDIR', en:'Applause', desc:'Deux mains ouvertes (pouces fermés)' },
-  { key:'MAISON',    emoji:'🏠', fr:'MAISON',    en:'Home',     desc:'Deux mains index+majeur (toit)' },
-  { key:'ENSEMBLE',  emoji:'🤝', fr:'ENSEMBLE',  en:'Together', desc:'Deux pouces levés vers le haut' },
-  { key:'VOITURE',   emoji:'🚗', fr:'VOITURE',   en:'Car',      desc:'Deux poings fermés (volant)' },
-  { key:'BRAVO',     emoji:'🎉', fr:'BRAVO',     en:'Bravo',    desc:'Deux mains rock (index+auriculaire)' },
-];
-
 function buildRefGrid() {
   const g = document.getElementById('refGrid');
   SIGNS.forEach(s => {
-    g.innerHTML += '<div class="ref-item">'
-      + '<span class="ref-emoji">' + s.emoji + '</span>'
-      + '<span class="ref-label">' + s.fr + '</span>'
-      + '<span class="ref-desc">' + s.desc + '</span>'
-      + '</div>';
-  });
-  SIGNS_2H.forEach(s => {
-    g.innerHTML += '<div class="ref-item" style="border-color:#c4b5f4">'
-      + '<span class="ref-emoji">' + s.emoji + '</span>'
-      + '<span class="ref-label">' + s.fr + ' <span style="font-size:8px;background:#764ba2;color:#fff;border-radius:3px;padding:1px 3px">2M</span></span>'
-      + '<span class="ref-desc">' + s.desc + '</span>'
-      + '</div>';
+    g.innerHTML += `<div class="ref-item">
+      <span class="ref-emoji">${s.emoji}</span>
+      <span class="ref-label">${s.fr}</span>
+      <span class="ref-desc">${s.desc}</span>
+    </div>`;
   });
 }
 
@@ -451,29 +435,6 @@ function classify(lm) {
   return { sign: null, conf: 0 };
 }
 
-// ── Two-hand classification — purely additive, classify() unchanged ──
-function classify2H(lm1, lm2) {
-  var f1 = getStates(lm1);
-  var f2 = getStates(lm2);
-  // ok: checks one hand state; -1 = don't care
-  var ok = function(f, I, M, R, P, T) {
-    if (I !== -1 && f.index  !== (I === 1)) return false;
-    if (M !== -1 && f.middle !== (M === 1)) return false;
-    if (R !== -1 && f.ring   !== (R === 1)) return false;
-    if (P !== -1 && f.pinky  !== (P === 1)) return false;
-    if (T !== -1 && f.thumb  !== (T === 1)) return false;
-    return true;
-  };
-  var both = function(I,M,R,P,T) { return ok(f1,I,M,R,P,T) && ok(f2,I,M,R,P,T); };
-
-  if (both(1,1,1,1,0))                              return { sign:SIGNS_2H[0], conf:85 }; // APPLAUDIR
-  if (both(1,1,0,0,0))                              return { sign:SIGNS_2H[1], conf:85 }; // MAISON
-  if (both(0,0,0,0,1) && f1.thumbUp && f2.thumbUp) return { sign:SIGNS_2H[2], conf:85 }; // ENSEMBLE
-  if (both(0,0,0,0,0))                              return { sign:SIGNS_2H[3], conf:85 }; // VOITURE
-  if (both(1,0,0,1,0))                              return { sign:SIGNS_2H[4], conf:85 }; // BRAVO
-  return { sign: null, conf: 0 };
-}
-
 // ── Camera logic ────────────────────────────────────────────────
 let mpH = null, rafId = null, stream = null, running = false;
 let holdKey = null, holdStart = 0, cooldownUntil = 0;
@@ -525,40 +486,29 @@ async function startCam() {
   document.getElementById('liveConf').textContent = 'Chargement modèle IA…';
 
   mpH = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
-  mpH.setOptions({ maxNumHands:2, modelComplexity:0, minDetectionConfidence:.55, minTrackingConfidence:.4 });
+  mpH.setOptions({ maxNumHands:1, modelComplexity:0, minDetectionConfidence:.55, minTrackingConfidence:.4 });
 
-  mpH.onResults(function(res) {
+  mpH.onResults(res => {
     ctx.clearRect(0, 0, cvs.width, cvs.height);
-    var hands = (res.multiHandLandmarks && res.multiHandLandmarks.length) ? res.multiHandLandmarks : [];
+    if (res.multiHandLandmarks?.length) {
+      const lm = res.multiHandLandmarks[0];
+      drawConnectors(ctx, lm, HAND_CONNECTIONS, { color:'#667eea', lineWidth:2 });
+      drawLandmarks(ctx,  lm, { color:'#fff', fillColor:'#764ba2', radius:3 });
 
-    // Draw skeleton for every detected hand
-    for (var i = 0; i < hands.length; i++) {
-      drawConnectors(ctx, hands[i], HAND_CONNECTIONS, { color:'#667eea', lineWidth:2 });
-      drawLandmarks(ctx,  hands[i], { color:'#fff', fillColor:'#764ba2', radius:3 });
-    }
-
-    var lm1 = hands.length > 0 ? hands[0] : null;
-    var lm2 = hands.length > 1 ? hands[1] : null;
-
-    if (lm1) {
-      // Two-hand first; fall back to single-hand
-      var r2h = lm2 ? classify2H(lm1, lm2) : { sign: null, conf: 0 };
-      var result = (r2h && r2h.sign) ? r2h : classify(lm1);
-      var sign = result.sign;
-      var conf = result.conf;
+      const { sign, conf } = classify(lm);
 
       if (debugOn) {
-        var f = getStates(lm1);
+        const f = getStates(lm);
         document.getElementById('dbg').innerHTML =
-          'Mains:' + hands.length + ' T:' + (+f.thumb) + ' I:' + (+f.index) + ' M:' + (+f.middle) + ' R:' + (+f.ring) + ' P:' + (+f.pinky) + '<br>'
-          + 'thumbUp:' + (+f.thumbUp) + ' dn:' + (+f.thumbDown) + '<br>'
-          + 'thumbDist:' + f.thumbDist.toFixed(3) + ' palm:' + f.palmSz.toFixed(3) + '<br>'
-          + (sign ? sign.fr : '—');
+          `T:${+f.thumb} I:${+f.index} M:${+f.middle} R:${+f.ring} P:${+f.pinky}<br>`+
+          `thumbUp:${+f.thumbUp} dn:${+f.thumbDown}<br>`+
+          `thumbDist:${f.thumbDist.toFixed(3)} palm:${f.palmSz.toFixed(3)}<br>`+
+          `→ ${sign ? sign.fr : '—'}`;
       }
       onDetect(sign, conf);
     } else {
       onDetect(null, 0);
-      if (debugOn) document.getElementById('dbg').innerHTML = 'Aucune main été détectée';
+      if (debugOn) document.getElementById('dbg').innerHTML = 'Aucune main détectée';
     }
   });
 

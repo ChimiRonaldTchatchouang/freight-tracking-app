@@ -355,47 +355,44 @@ document.addEventListener('DOMContentLoaded',()=>{
 ═══════════════════════════════════════════════════════════════ */
 
 // ── Sign dictionary (LSF-labelled) ─────────────────────────────
+// Signes à une main (inchangés depuis v1.0-stable)
 const SIGNS = [
   { key:'BONJOUR', emoji:'👋', fr:'BONJOUR',      en:'Hello',       fingers:[1,1,1,1,1], thumbNeeded:true,  desc:'Main ouverte, 5 doigts levés' },
   { key:'OUI',     emoji:'✊', fr:'OUI',           en:'Yes',         fingers:[0,0,0,0,0], thumbNeeded:false, desc:'Poing fermé, tous les doigts pliés' },
-  { key:'BIEN',    emoji:'👍', fr:'BIEN',          en:'Good',        fingers:[1,0,0,0,0], thumbNeeded:true, thumbDir:'up', desc:'Pouce levé, autres doigts fermés' },
-  { key:'MAUVAIS', emoji:'👎', fr:'MAUVAIS',       en:'Bad',         fingers:[1,0,0,0,0], thumbNeeded:true, thumbDir:'down', desc:'Pouce baissé, autres doigts fermés' },
-  { key:'JE_TAIME',emoji:'🤟', fr:'JE T\'AIME',   en:'I Love You',  fingers:[1,0,0,1], thumbNeeded:true, desc:'Pouce + Index + Auriculaire levés' },
+  { key:'BIEN',    emoji:'👍', fr:'BIEN',          en:'Good',        fingers:[0,0,0,0,0], thumbNeeded:true,  thumbDir:'up',   desc:'Pouce levé, autres doigts fermés' },
+  { key:'MAUVAIS', emoji:'👎', fr:'MAUVAIS',       en:'Bad',         fingers:[0,0,0,0,0], thumbNeeded:true,  thumbDir:'down', desc:'Pouce baissé, autres doigts fermés' },
+  { key:'JE_TAIME',emoji:'🤟', fr:'JE T\'AIME',   en:'I Love You',  fingers:[1,0,0,1],   thumbNeeded:true,  desc:'Pouce + Index + Auriculaire levés' },
   { key:'PAIX',    emoji:'✌️', fr:'PAIX / DEUX',  en:'Peace / Two', fingers:[0,1,1,0,0], thumbNeeded:false, desc:'Index + Majeur levés (V)' },
   { key:'UN',      emoji:'☝️', fr:'UN',            en:'One',         fingers:[0,1,0,0,0], thumbNeeded:false, desc:'Seulement l\'index levé' },
   { key:'TROIS',   emoji:'3️⃣', fr:'TROIS',        en:'Three',       fingers:[0,1,1,1,0], thumbNeeded:false, desc:'Index + Majeur + Annulaire' },
   { key:'QUATRE',  emoji:'🖐', fr:'QUATRE',        en:'Four',        fingers:[0,1,1,1,1], thumbNeeded:false, desc:'4 doigts levés, pouce fermé' },
-  { key:'APPELER', emoji:'🤙', fr:'APPELER',       en:'Call Me',     fingers:[1,0,0,0,1], thumbNeeded:true,  desc:'Pouce + Auriculaire levés (Y)' },
+  { key:'APPELER', emoji:'🤙', fr:'APPELER',       en:'Call Me',     fingers:[0,0,0,0,1], thumbNeeded:true,  desc:'Pouce + Auriculaire levés (Y)' },
   { key:'ROCK',    emoji:'🤘', fr:'ROCK',          en:'Rock',        fingers:[0,1,0,0,1], thumbNeeded:false, desc:'Index + Auriculaire levés' },
-  { key:'OK',      emoji:'👌', fr:'OK',            en:'OK',          fingers:[1,0,0,1,1], thumbNeeded:true,  desc:'Pouce + Annulaire + Auriculaire' },
-  // ── Signes à deux mains (two-hand signs checked first when both hands visible) ──
-  { key:'APPLAUDIR', emoji:'👏', fr:'APPLAUDIR',   en:'Applause',   hands:2, symmetric:true,
-    hand1:{ fingers:[1,1,1,1], thumbNeeded:false }, hand2:{ fingers:[1,1,1,1], thumbNeeded:false },
-    desc:'Deux mains ouvertes, pouces fermés' },
-  { key:'MAISON',   emoji:'🏠', fr:'MAISON',       en:'Home',       hands:2, symmetric:true,
-    hand1:{ fingers:[1,1,0,0], thumbNeeded:false }, hand2:{ fingers:[1,1,0,0], thumbNeeded:false },
-    desc:'Deux mains index+majeur (toit)' },
-  { key:'ENSEMBLE', emoji:'🤝', fr:'ENSEMBLE',     en:'Together',   hands:2, symmetric:true,
-    hand1:{ fingers:[0,0,0,0], thumbNeeded:true, thumbDir:'up' },
-    hand2:{ fingers:[0,0,0,0], thumbNeeded:true, thumbDir:'up' },
-    desc:'Deux pouces levés' },
-  { key:'VOITURE',  emoji:'🚗', fr:'VOITURE',      en:'Car',        hands:2, symmetric:true,
-    hand1:{ fingers:[0,0,0,0], thumbNeeded:false }, hand2:{ fingers:[0,0,0,0], thumbNeeded:false },
-    desc:'Deux poings fermés (volant)' },
-  { key:'BRAVO',    emoji:'🎉', fr:'BRAVO',        en:'Bravo',      hands:2, symmetric:true,
-    hand1:{ fingers:[1,0,0,1], thumbNeeded:false }, hand2:{ fingers:[1,0,0,1], thumbNeeded:false },
-    desc:'Deux mains rock (index+auriculaire)' },
+  { key:'OK',      emoji:'👌', fr:'OK',            en:'OK',          fingers:[0,0,1,1,1], thumbNeeded:true,  desc:'Pouce + Annulaire + Auriculaire' },
+];
+
+// Signes à deux mains — tableau séparé, logique indépendante
+const SIGNS_2H = [
+  { key:'APPLAUDIR', emoji:'👏', fr:'APPLAUDIR', en:'Applause', desc:'Deux mains ouvertes' },
+  { key:'MAISON',    emoji:'🏠', fr:'MAISON',    en:'Home',     desc:'Deux mains index+majeur' },
+  { key:'ENSEMBLE',  emoji:'🤝', fr:'ENSEMBLE',  en:'Together', desc:'Deux pouces levés' },
+  { key:'VOITURE',   emoji:'🚗', fr:'VOITURE',   en:'Car',      desc:'Deux poings fermés' },
+  { key:'BRAVO',     emoji:'🎉', fr:'BRAVO',     en:'Bravo',    desc:'Deux mains rock' },
 ];
 
 function buildRefGrid() {
   const g = document.getElementById('refGrid');
   SIGNS.forEach(s => {
-    const badge = s.hands === 2
-      ? ' <span style="font-size:8px;background:#764ba2;color:#fff;border-radius:3px;padding:1px 3px">2M</span>'
-      : '';
     g.innerHTML += `<div class="ref-item">
       <span class="ref-emoji">${s.emoji}</span>
-      <span class="ref-label">${s.fr}${badge}</span>
+      <span class="ref-label">${s.fr}</span>
+      <span class="ref-desc">${s.desc}</span>
+    </div>`;
+  });
+  SIGNS_2H.forEach(s => {
+    g.innerHTML += `<div class="ref-item" style="border-color:#c4b5f4">
+      <span class="ref-emoji">${s.emoji}</span>
+      <span class="ref-label">${s.fr} <span style="font-size:8px;background:#764ba2;color:#fff;border-radius:3px;padding:1px 3px">2M</span></span>
       <span class="ref-desc">${s.desc}</span>
     </div>`;
   });
@@ -425,45 +422,19 @@ function getStates(lm) {
   return { thumb, thumbUp, thumbDown, index, middle, ring, pinky, palmSz, thumbDist };
 }
 
-// Match one hand state against a two-hand sign slot descriptor
-function matchHand(f, pat) {
-  const fi = [f.index, f.middle, f.ring, f.pinky];
-  for (let i = 0; i < 4; i++) {
-    if (pat.fingers[i] === 1 && !fi[i]) return false;
-    if (pat.fingers[i] === 0 &&  fi[i]) return false;
-  }
-  if (pat.thumbNeeded !== undefined) {
-    if ( pat.thumbNeeded && !f.thumb) return false;
-    if (!pat.thumbNeeded &&  f.thumb) return false;
-  }
-  if (pat.thumbDir === 'up'   && !f.thumbUp)   return false;
-  if (pat.thumbDir === 'down' && !f.thumbDown) return false;
-  return true;
-}
-
-function classify(lm1, lm2) {
-  // ── Two-hand signs: checked first when both hands are visible ──
-  if (lm2) {
-    const f1 = getStates(lm1), f2 = getStates(lm2);
-    for (const s of SIGNS) {
-      if (s.hands !== 2) continue;
-      if (matchHand(f1, s.hand1) && matchHand(f2, s.hand2)) return { sign: s, conf: 85 };
-      if (s.symmetric && matchHand(f1, s.hand2) && matchHand(f2, s.hand1)) return { sign: s, conf: 85 };
-    }
-  }
-
-  // ── Single-hand classification on first detected hand ──
-  const f = getStates(lm1);
+// Reconnaissance une main — identique à v1.0-stable, non modifiée
+function classify(lm) {
+  const f = getStates(lm);
   const fi = [f.index, f.middle, f.ring, f.pinky];
 
   function match(pat, needThumb, thumbDir) {
-    for (let i = 0; i < 4; i++) {
-      if (pat[i] === 1 && !fi[i]) return false;
-      if (pat[i] === 0 &&  fi[i]) return false;
+    for (let i=0; i<4; i++) {
+      if (pat[i]===1 && !fi[i]) return false;
+      if (pat[i]===0 && fi[i])  return false;
     }
     if (needThumb !== undefined) {
-      if ( needThumb && !f.thumb) return false;
-      if (!needThumb &&  f.thumb) return false;
+      if (needThumb && !f.thumb) return false;
+      if (!needThumb && f.thumb) return false;
     }
     if (thumbDir === 'up'   && !f.thumbUp)   return false;
     if (thumbDir === 'down' && !f.thumbDown) return false;
@@ -471,12 +442,33 @@ function classify(lm1, lm2) {
   }
 
   for (const s of SIGNS) {
-    if (s.hands === 2) continue; // skip two-hand signs in single-hand pass
     const pat = s.fingers;
     const p4 = pat.length === 5 ? pat.slice(1) : pat;
     const needThumb = pat.length === 5 ? !!pat[0] : s.thumbNeeded;
-    if (match(p4, needThumb, s.thumbDir)) return { sign: s, conf: 82 };
+    if (match(p4, needThumb, s.thumbDir)) { return { sign: s, conf: 82 }; }
   }
+  return { sign: null, conf: 0 };
+}
+
+// Reconnaissance deux mains — couche séparée, n'affecte pas classify()
+function classify2H(lm1, lm2) {
+  const f1 = getStates(lm1), f2 = getStates(lm2);
+  // ok(f, I,M,R,P,T) : vérifie les états doigts ; -1 = indifférent
+  function ok(f, I, M, R, P, T) {
+    if (I !== -1 && f.index  !== (I === 1)) return false;
+    if (M !== -1 && f.middle !== (M === 1)) return false;
+    if (R !== -1 && f.ring   !== (R === 1)) return false;
+    if (P !== -1 && f.pinky  !== (P === 1)) return false;
+    if (T !== -1 && f.thumb  !== (T === 1)) return false;
+    return true;
+  }
+  function both(I,M,R,P,T) { return ok(f1,I,M,R,P,T) && ok(f2,I,M,R,P,T); }
+
+  if (both(1,1,1,1,0))                                return { sign:SIGNS_2H[0], conf:85 }; // APPLAUDIR
+  if (both(1,1,0,0,0))                                return { sign:SIGNS_2H[1], conf:85 }; // MAISON
+  if (both(0,0,0,0,1) && f1.thumbUp && f2.thumbUp)   return { sign:SIGNS_2H[2], conf:85 }; // ENSEMBLE
+  if (both(0,0,0,0,0))                                return { sign:SIGNS_2H[3], conf:85 }; // VOITURE
+  if (both(1,0,0,1,0))                                return { sign:SIGNS_2H[4], conf:85 }; // BRAVO
   return { sign: null, conf: 0 };
 }
 
@@ -543,14 +535,19 @@ async function startCam() {
 
     const lm1 = hands[0] || null;
     const lm2 = hands[1] || null;
+
     if (lm1) {
-      const { sign, conf } = classify(lm1, lm2);
+      // Essai deux mains en premier ; fallback sur une main
+      let result = null;
+      if (lm2) result = classify2H(lm1, lm2);
+      if (!result || !result.sign) result = classify(lm1);
+      const { sign, conf } = result;
+
       if (debugOn) {
         const f = getStates(lm1);
         document.getElementById('dbg').innerHTML =
           `Mains:${hands.length} T:${+f.thumb} I:${+f.index} M:${+f.middle} R:${+f.ring} P:${+f.pinky}<br>`+
           `thumbUp:${+f.thumbUp} dn:${+f.thumbDown}<br>`+
-          `thumbDist:${f.thumbDist.toFixed(3)} palm:${f.palmSz.toFixed(3)}<br>`+
           `→ ${sign ? sign.fr : '—'}`;
       }
       onDetect(sign, conf);

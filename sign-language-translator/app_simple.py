@@ -268,6 +268,7 @@ hr{border:none;border-top:2px solid #f0f0f0;margin:1.25rem 0}
         <button class="cb cb-stop" id="btnStop"  onclick="stopCam()">■ Arrêter</button>
         <button class="cb cb-cl"   onclick="clearSent()">✕ Effacer</button>
       </div>
+      <button onclick="speakSentence()" style="width:100%;padding:.65rem;border:1.5px solid #d4caf0;border-radius:8px;background:#f0eeff;color:#667eea;font-weight:700;font-size:13px;cursor:pointer;margin-bottom:.75rem">🔊 Lire la phrase à voix haute</button>
 
       <h3 style="margin-bottom:.5rem">Signes reconnus</h3>
       <div class="ref-grid" id="refGrid"></div>
@@ -447,20 +448,42 @@ function toggleDebug() {
 }
 
 async function startCam() {
+  // Déverrouiller la synthèse vocale dans le geste utilisateur (obligatoire iOS)
+  try {
+    const u = new SpeechSynthesisUtterance(' ');
+    u.volume = 0.01; u.lang = 'fr-FR';
+    speechSynthesis.speak(u);
+    setTimeout(() => speechSynthesis.cancel(), 100);
+  } catch(_) {}
+
   document.getElementById('btnStart').style.display = 'none';
   document.getElementById('btnStop').style.display  = 'block';
-  document.getElementById('liveConf').textContent = 'Chargement MediaPipe…';
+  document.getElementById('liveConf').textContent = 'Accès caméra…';
 
   const vid = document.getElementById('vid');
   const cvs = document.getElementById('cvs');
   const ctx = cvs.getContext('2d');
 
+  // Mobile-friendly : pas de dimensions fixes, fallback si facingMode échoue
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'user',width:640,height:480 }});
-    vid.srcObject = stream;
-    await new Promise(r => { vid.onloadedmetadata = r; });
-    cvs.width = vid.videoWidth; cvs.height = vid.videoHeight;
-  } catch(e) { alert('Caméra refusée: ' + e.message); resetUI(); return; }
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'user' } }, audio: false
+    });
+  } catch(e1) {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    } catch(e2) { alert('Caméra refusée: ' + e2.message); resetUI(); return; }
+  }
+
+  vid.srcObject = stream;
+  await new Promise(r => { vid.onloadedmetadata = () => r(); setTimeout(r, 4000); });
+  try { await vid.play(); } catch(_) {}
+
+  const setSize = () => { cvs.width = vid.videoWidth || 640; cvs.height = vid.videoHeight || 480; };
+  setSize();
+  vid.addEventListener('resize', setSize);
+
+  document.getElementById('liveConf').textContent = 'Chargement modèle IA…';
 
   mpH = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
   mpH.setOptions({ maxNumHands:1, modelComplexity:0, minDetectionConfidence:.55, minTrackingConfidence:.4 });
@@ -553,7 +576,7 @@ function onDetect(sign, conf) {
   document.getElementById('tcircle').style.strokeDashoffset = dashOffset;
 
   if (progress >= 1) {
-    // ✅ Confirmed!
+    // ✅ Confirmé — ajouter à la phrase et lire à voix haute
     sentence.push(sign.fr);
     const box = document.getElementById('sentBox');
     box.classList.remove('empty');
@@ -562,6 +585,7 @@ function onDetect(sign, conf) {
     holdKey = null; holdStart = 0;
     document.getElementById('tring').style.display = 'none';
     document.getElementById('panSub').textContent = '✅ Ajouté !';
+    speakFR(sign.fr);
   } else {
     const rem = ((HOLD_MS - elapsed)/1000).toFixed(1);
     document.getElementById('panSub').textContent = `Maintenez… ${rem}s`;
@@ -575,6 +599,40 @@ function clearSent() {
   box.textContent = 'Les mots reconnus apparaîtront ici…';
   holdKey = null; holdStart = 0;
   cooldownUntil = 0;
+}
+
+// ── Synthèse vocale française ────────────────────────────────────
+let ttsVoice = null;
+
+function initVoices() {
+  const voices = speechSynthesis.getVoices();
+  ttsVoice = voices.find(v => v.lang === 'fr-FR')
+          || voices.find(v => v.lang.startsWith('fr'))
+          || voices[0] || null;
+}
+if (window.speechSynthesis) {
+  speechSynthesis.onvoiceschanged = initVoices;
+  setTimeout(initVoices, 500);
+}
+
+// Lecture automatique d'un mot (appelé à chaque signe confirmé)
+function speakFR(text) {
+  if (!window.speechSynthesis) return;
+  speechSynthesis.cancel();
+  const utt = new SpeechSynthesisUtterance(text);
+  utt.lang = 'fr-FR'; utt.rate = 0.9; utt.pitch = 1; utt.volume = 1;
+  if (ttsVoice) utt.voice = ttsVoice;
+  speechSynthesis.speak(utt);
+}
+
+// Bouton "Lire" — déclenché par geste utilisateur (iOS-safe)
+function speakSentence() {
+  if (!sentence.length) { speakFR('Aucun mot'); return; }
+  speechSynthesis.cancel();
+  const utt = new SpeechSynthesisUtterance(sentence.join(', '));
+  utt.lang = 'fr-FR'; utt.rate = 0.85; utt.volume = 1;
+  if (ttsVoice) utt.voice = ttsVoice;
+  speechSynthesis.speak(utt);
 }
 </script>
 </body>

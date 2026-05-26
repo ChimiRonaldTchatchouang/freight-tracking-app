@@ -436,7 +436,7 @@ function classify(lm) {
 }
 
 // ── Camera logic ────────────────────────────────────────────────
-let mpH = null, mpCam = null, stream = null, running = false;
+let mpH = null, rafId = null, stream = null, running = false;
 let holdKey = null, holdStart = 0, cooldownUntil = 0;
 const HOLD_MS = 1000;
 let sentence = [];
@@ -513,17 +513,23 @@ async function startCam() {
   });
 
   running = true;
-  mpCam = new Camera(vid, {
-    onFrame: async () => { if (running) await mpH.send({ image: vid }); },
-    width:640, height:480
-  });
-  await mpCam.start();
-  document.getElementById('liveConf').textContent = '✅ MediaPipe actif — montrez un signe !';
+  let lastTs = 0;
+  const FRAME_MS = 1000 / 20; // 20 fps
+  function loop(ts) {
+    if (!running) return;
+    rafId = requestAnimationFrame(loop); // schedule FIRST — non-blocking on iOS
+    if (ts - lastTs >= FRAME_MS && vid.readyState >= 2) {
+      lastTs = ts;
+      mpH.send({ image: vid }); // fire-and-forget, no await
+    }
+  }
+  rafId = requestAnimationFrame(loop);
+  document.getElementById('liveConf').textContent = '✅ Actif — montrez un signe !';
 }
 
 function stopCam() {
   running = false;
-  if (mpCam)   { mpCam.stop(); mpCam = null; }
+  if (rafId)   { cancelAnimationFrame(rafId); rafId = null; }
   if (mpH)     { mpH.close(); mpH = null; }
   if (stream)  { stream.getTracks().forEach(t=>t.stop()); stream = null; }
   document.getElementById('cvs').getContext('2d').clearRect(0,0,9999,9999);

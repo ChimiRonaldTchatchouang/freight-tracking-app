@@ -108,9 +108,9 @@ HTML = r"""<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Traducteur LSF</title>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3.1620248257/drawing_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1620248257/camera_utils.js" crossorigin="anonymous"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:linear-gradient(135deg,#667eea,#764ba2);min-height:100vh;padding:1.5rem}
@@ -396,9 +396,9 @@ const SIGNS = [
   { key:'PAIX',        emoji:'✌️', fr:'PAIX / DEUX',    en:'Peace/Two',  fingers:[0,1,1,0,0], desc:'Index+Majeur levés (V de victoire)' },
   { key:'PARLER',      emoji:'💬',  fr:'PARLER',         en:'Speak',      fingers:[0,1,0,1,1], desc:'Index+Annulaire+Auriculaire levés' },
   { key:'TRISTE',      emoji:'😢',  fr:'TRISTE',         en:'Sad',        fingers:[0,0,1,1,1], desc:'Majeur+Annulaire+Auriculaire levés' },
-  { key:'FAMILLE',     emoji:'👨‍👩‍👧', fr:'FAMILLE',       en:'Family',     fingers:[0,0,1,1,0], desc:'Majeur+Annulaire levés (F approx.)' },
+  { key:'FAMILLE',     emoji:'👪', fr:'FAMILLE',   en:'Family',     fingers:[0,0,1,1,0], desc:'Majeur+Annulaire levés (F approx.)' },
   { key:'HEUREUX',     emoji:'😊',  fr:'HEUREUX',        en:'Happy',      fingers:[0,1,0,1,0], desc:'Index+Annulaire levés, écartés' },
-  { key:'MANGER',      emoji:'🍽️', fr:'MANGER',         en:'Eat',        fingers:[0,0,1,0,1], desc:'Majeur+Auriculaire levés' },
+  { key:'MANGER',      emoji:'🍴', fr:'MANGER',   en:'Eat',        fingers:[0,0,1,0,1], desc:'Majeur+Auriculaire levés' },
   { key:'ROCK',        emoji:'🤘',  fr:'ROCK',           en:'Rock',       fingers:[0,1,0,0,1], desc:'Index+Auriculaire levés' },
   { key:'EAU',         emoji:'💧',  fr:'EAU',            en:'Water',      fingers:[0,0,0,1,1], desc:'Annulaire+Auriculaire levés' },
   { key:'UN',          emoji:'☝️', fr:'UN',             en:'One',        fingers:[0,1,0,0,0], desc:'Seulement l\'index levé' },
@@ -528,7 +528,7 @@ async function startCam() {
 
   document.getElementById('liveConf').textContent = 'Chargement modèle IA…';
 
-  mpH = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
+  mpH = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${f}` });
   mpH.setOptions({
     maxNumHands: 1,
     modelComplexity: 0,           // Fastest — essential for mobile
@@ -537,24 +537,28 @@ async function startCam() {
   });
 
   mpH.onResults(res => {
-    ctx.clearRect(0, 0, cvs.width, cvs.height);
-    if (res.multiHandLandmarks?.length) {
-      const lm = res.multiHandLandmarks[0];
-      drawConnectors(ctx, lm, HAND_CONNECTIONS, { color:'#667eea', lineWidth:2 });
-      drawLandmarks(ctx,  lm, { color:'#fff', fillColor:'#764ba2', radius:3 });
-      const { sign, conf } = classify(lm);
-      if (debugOn) {
-        const f = getStates(lm);
-        document.getElementById('dbg').innerHTML =
-          `T:${+f.thumb} I:${+f.index} M:${+f.middle} R:${+f.ring} P:${+f.pinky}<br>`+
-          `tUp:${+f.thumbUp} tDn:${+f.thumbDown}<br>`+
-          `tDist:${f.thumbDist.toFixed(3)} palm:${f.palmSz.toFixed(3)}<br>`+
-          `→ ${sign ? sign.fr : '—'}`;
+    try {
+      ctx.clearRect(0, 0, cvs.width, cvs.height);
+      if (res.multiHandLandmarks && res.multiHandLandmarks.length > 0) {
+        const lm = res.multiHandLandmarks[0];
+        drawConnectors(ctx, lm, HAND_CONNECTIONS, { color:'#667eea', lineWidth:2 });
+        drawLandmarks(ctx, lm, { color:'#fff', fillColor:'#764ba2', radius:3 });
+        const { sign, conf } = classify(lm);
+        if (debugOn) {
+          const f = getStates(lm);
+          document.getElementById('dbg').innerHTML =
+            `T:${+f.thumb} I:${+f.index} M:${+f.middle} R:${+f.ring} P:${+f.pinky}<br>`+
+            `tUp:${+f.thumbUp} tDn:${+f.thumbDown}<br>`+
+            `tDist:${f.thumbDist.toFixed(3)} palm:${f.palmSz.toFixed(3)}<br>`+
+            `→ ${sign ? sign.fr : '—'}`;
+        }
+        onDetect(sign, conf);
+      } else {
+        onDetect(null, 0);
+        if (debugOn) document.getElementById('dbg').innerHTML = 'Aucune main';
       }
-      onDetect(sign, conf);
-    } else {
-      onDetect(null, 0);
-      if (debugOn) document.getElementById('dbg').innerHTML = 'Aucune main';
+    } catch(err) {
+      if (debugOn) document.getElementById('dbg').innerHTML = 'ERR: ' + err.message;
     }
   });
 

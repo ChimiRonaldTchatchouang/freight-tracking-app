@@ -108,9 +108,8 @@ HTML = r"""<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Traducteur LSF</title>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3.1620248257/drawing_utils.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1620248257/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:linear-gradient(135deg,#667eea,#764ba2);min-height:100vh;padding:1.5rem}
@@ -526,39 +525,55 @@ async function startCam() {
   setSize();
   vid.addEventListener('resize', setSize);
 
-  document.getElementById('liveConf').textContent = 'Chargement modèle IA…';
+  const confEl = document.getElementById('liveConf');
+  confEl.textContent = 'Chargement modèle IA…';
 
-  mpH = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${f}` });
+  // Vérifier que MediaPipe est chargé
+  if (typeof Hands === 'undefined') {
+    confEl.textContent = 'ERREUR: MediaPipe non charge. Verifiez connexion internet.';
+    resetUI(); return;
+  }
+
+  try {
+    mpH = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
+  } catch(e) {
+    confEl.textContent = 'ERREUR init MediaPipe: ' + e.message;
+    resetUI(); return;
+  }
+
   mpH.setOptions({
     maxNumHands: 1,
-    modelComplexity: 0,           // Fastest — essential for mobile
+    modelComplexity: 0,
     minDetectionConfidence: 0.5,
     minTrackingConfidence: 0.4
   });
 
+  let firstResult = false;
   mpH.onResults(res => {
-    try {
-      ctx.clearRect(0, 0, cvs.width, cvs.height);
-      if (res.multiHandLandmarks && res.multiHandLandmarks.length > 0) {
-        const lm = res.multiHandLandmarks[0];
+    if (!firstResult) {
+      firstResult = true;
+      confEl.textContent = 'Modele charge — montrez votre main !';
+    }
+    ctx.clearRect(0, 0, cvs.width, cvs.height);
+    if (res.multiHandLandmarks && res.multiHandLandmarks.length > 0) {
+      const lm = res.multiHandLandmarks[0];
+      try {
         drawConnectors(ctx, lm, HAND_CONNECTIONS, { color:'#667eea', lineWidth:2 });
-        drawLandmarks(ctx, lm, { color:'#fff', fillColor:'#764ba2', radius:3 });
-        const { sign, conf } = classify(lm);
-        if (debugOn) {
-          const f = getStates(lm);
-          document.getElementById('dbg').innerHTML =
-            `T:${+f.thumb} I:${+f.index} M:${+f.middle} R:${+f.ring} P:${+f.pinky}<br>`+
-            `tUp:${+f.thumbUp} tDn:${+f.thumbDown}<br>`+
-            `tDist:${f.thumbDist.toFixed(3)} palm:${f.palmSz.toFixed(3)}<br>`+
-            `→ ${sign ? sign.fr : '—'}`;
-        }
-        onDetect(sign, conf);
-      } else {
-        onDetect(null, 0);
-        if (debugOn) document.getElementById('dbg').innerHTML = 'Aucune main';
+        drawLandmarks(ctx,  lm, { color:'#fff', fillColor:'#764ba2', radius:3 });
+      } catch(_) {}
+      const { sign, conf } = classify(lm);
+      if (debugOn) {
+        const f = getStates(lm);
+        document.getElementById('dbg').innerHTML =
+          `T:${+f.thumb} I:${+f.index} M:${+f.middle} R:${+f.ring} P:${+f.pinky}<br>`+
+          `tUp:${+f.thumbUp} tDn:${+f.thumbDown}<br>`+
+          `tDist:${f.thumbDist.toFixed(3)} palm:${f.palmSz.toFixed(3)}<br>`+
+          `sign: ${sign ? sign.fr : 'none'}`;
       }
-    } catch(err) {
-      if (debugOn) document.getElementById('dbg').innerHTML = 'ERR: ' + err.message;
+      onDetect(sign, conf);
+    } else {
+      onDetect(null, 0);
+      if (debugOn) document.getElementById('dbg').innerHTML = 'Aucune main detectee';
     }
   });
 
@@ -567,16 +582,23 @@ async function startCam() {
   let lastTs = 0;
   const FRAME_MS = 1000 / 20; // 20 fps
 
+  // Timeout: si onResults n'a pas tiré après 15s → modèle WASM non chargé
+  const loadTimeout = setTimeout(() => {
+    if (!firstResult && running) {
+      confEl.textContent = 'Modele lent a charger... verifiez votre connexion internet.';
+    }
+  }, 15000);
+
   function loop(ts) {
     if (!running) return;
-    rafId = requestAnimationFrame(loop); // schedule immediately, no blocking
+    rafId = requestAnimationFrame(loop);
     if (ts - lastTs >= FRAME_MS && vid.readyState >= 2) {
       lastTs = ts;
-      mpH.send({ image: vid }); // fire-and-forget — onResults called async
+      try { mpH.send({ image: vid }); } catch(_) {}
     }
   }
   rafId = requestAnimationFrame(loop);
-  document.getElementById('liveConf').textContent = '✅ Actif — montrez un signe !';
+  // NE PAS mettre ✅ ici — le message est mis dans onResults au premier résultat
 }
 
 function stopCam() {

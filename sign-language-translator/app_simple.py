@@ -92,9 +92,7 @@ HTML = r"""<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Traducteur LSF</title>
-<script src="https://unpkg.com/@mediapipe/hands@0.4.1646424915/hands.js" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/@mediapipe/drawing_utils@0.3.1620248257/drawing_utils.js" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/@mediapipe/camera_utils@0.3.1620248257/camera_utils.js" crossorigin="anonymous"></script>
+<!-- @mediapipe/tasks-vision chargé dynamiquement dans startCam() -->
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:linear-gradient(135deg,#667eea,#764ba2);min-height:100vh;padding:1.5rem}
@@ -518,7 +516,7 @@ function classify(lm) {
 }
 
 // ── Camera logic ────────────────────────────────────────────────
-let mpH = null, rafId = null, stream = null, running = false;
+let handLandmarker = null, rafId = null, stream = null, running = false;
 let holdKey = null, holdStart = 0, cooldownUntil = 0;
 const HOLD_MS = 1000;
 let sentence = [];
@@ -530,7 +528,6 @@ function toggleDebug() {
 }
 
 async function startCam() {
-  // Déverrouiller la synthèse vocale dans le geste utilisateur (obligatoire iOS)
   try {
     const u = new SpeechSynthesisUtterance(' ');
     u.volume = 0.01; u.lang = 'fr-FR';
@@ -547,7 +544,6 @@ async function startCam() {
   const ctx = cvs.getContext('2d');
 
   appLog('info', 'Demande accès caméra…');
-  // Mobile-friendly : pas de dimensions fixes, fallback si facingMode échoue
   try {
     stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: { ideal: 'user' } }, audio: false
@@ -574,43 +570,67 @@ async function startCam() {
   vid.addEventListener('resize', setSize);
 
   document.getElementById('liveConf').textContent = 'Chargement modèle IA…';
+  appLog('info', 'Chargement @mediapipe/tasks-vision (API moderne)…');
 
-  // SIMD WebAssembly detection — not supported on iOS < 16.4 and some Android browsers
-  var simdOk = false;
+  var hlInst, drawInst, HAND_CONNS;
   try {
-    simdOk = WebAssembly.validate(new Uint8Array([
-      0,97,115,109,1,0,0,0,1,5,1,96,0,1,123,3,2,1,0,10,10,1,8,0,65,0,253,15,253,98,11
-    ]));
-  } catch(e) { simdOk = false; }
-  appLog('info', 'SIMD WASM: ' + (simdOk ? 'supporté ✓' : 'non supporté → fallback non-SIMD'));
+    // Modern MediaPipe Tasks Vision — handles SIMD/non-SIMD automatically
+    var tv = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3');
+    var HandLandmarker = tv.HandLandmarker;
+    var FilesetResolver = tv.FilesetResolver;
+    var DrawingUtils    = tv.DrawingUtils;
+    HAND_CONNS = HandLandmarker.HAND_CONNECTIONS;
+    appLog('ok', 'Module chargé');
 
-  mpH = new Hands({ locateFile: f => {
-    // Redirect SIMD files to non-SIMD equivalents when not supported
-    var file = (simdOk || !f.includes('simd')) ? f : f.replace('simd_wasm_bin', 'wasm_bin');
-    appLog('info', 'CDN: ' + file);
-    return 'https://unpkg.com/@mediapipe/hands@0.4.1646424915/' + file;
-  }});
-  mpH.setOptions({ maxNumHands:1, modelComplexity:0, minDetectionConfidence:.5, minTrackingConfidence:.35 });
+    var fs = await FilesetResolver.forVisionTasks(
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm'
+    );
+    appLog('ok', 'WASM résolu');
 
-  var frameCount = 0, detectCount = 0;
-  mpH.onResults(res => {
+    hlInst = await HandLandmarker.createFromOptions(fs, {
+      baseOptions: {
+        modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
+        delegate: 'CPU'
+      },
+      runningMode: 'VIDEO',
+      numHands: 1
+    });
+    handLandmarker = hlInst;
+    drawInst = new DrawingUtils(ctx);
+    appLog('ok', 'HandLandmarker prêt ✓');
+  } catch(e) {
+    appLog('err', 'Erreur init MediaPipe: ' + (e.message || e));
+    alert('Erreur MediaPipe Tasks: ' + (e.message || e));
+    resetUI(); return;
+  }
+
+  running = true;
+  var frameCount = 0, detectCount = 0, lastTs = 0;
+  const FRAME_MS = 1000 / 20;
+
+  function loop(ts) {
+    if (!running) return;
+    rafId = requestAnimationFrame(loop);
+    if (ts - lastTs < FRAME_MS || vid.readyState < 2) return;
+    lastTs = ts;
     frameCount++;
+
     ctx.clearRect(0, 0, cvs.width, cvs.height);
-    if (res.multiHandLandmarks && res.multiHandLandmarks.length) {
+    var res = hlInst.detectForVideo(vid, ts);
+
+    if (res.landmarks && res.landmarks.length > 0) {
       detectCount++;
-      var lm = res.multiHandLandmarks[0];
-      drawConnectors(ctx, lm, HAND_CONNECTIONS, { color:'#667eea', lineWidth:2 });
-      drawLandmarks(ctx,  lm, { color:'#fff', fillColor:'#764ba2', radius:3 });
+      var lm = res.landmarks[0];
+      drawInst.drawConnectors(lm, HAND_CONNS, { color:'#667eea', lineWidth:2 });
+      drawInst.drawLandmarks(lm, { color:'#fff', fillColor:'#764ba2', radius:3 });
 
       var result = classify(lm);
       var sign = result.sign, conf = result.conf;
 
-      // Log chaque 30 frames avec détection
       if (detectCount % 30 === 1) {
         var f = getStates(lm);
         appLog('ok', 'Main#' + detectCount + ' T:' + (+f.thumb) + ' I:' + (+f.index) + ' M:' + (+f.middle) + ' R:' + (+f.ring) + ' P:' + (+f.pinky) + ' → ' + (sign ? sign.fr : 'aucun'));
       }
-
       if (debugOn) {
         var f2 = getStates(lm);
         document.getElementById('dbg').innerHTML =
@@ -622,25 +642,12 @@ async function startCam() {
       onDetect(sign, conf);
     } else {
       onDetect(null, 0);
-      // Log "pas de main" toutes les 60 frames
       if (frameCount % 60 === 0) appLog('warn', 'Frame#' + frameCount + ' — aucune main détectée');
       if (debugOn) document.getElementById('dbg').innerHTML = 'Aucune main détectée';
     }
-    // Log au 1er frame reçu
-    if (frameCount === 1) appLog('ok', 'MediaPipe actif — 1er frame reçu');
-  });
-
-  running = true;
-  let lastTs = 0;
-  const FRAME_MS = 1000 / 20; // 20 fps
-  function loop(ts) {
-    if (!running) return;
-    rafId = requestAnimationFrame(loop); // schedule FIRST — non-blocking on iOS
-    if (ts - lastTs >= FRAME_MS && vid.readyState >= 2) {
-      lastTs = ts;
-      mpH.send({ image: vid }); // fire-and-forget, no await
-    }
+    if (frameCount === 1) appLog('ok', 'MediaPipe actif — 1er frame reçu ✓');
   }
+
   rafId = requestAnimationFrame(loop);
   appLog('ok', 'Boucle RAF démarrée');
   document.getElementById('liveConf').textContent = '✅ Actif — montrez un signe !';
@@ -648,9 +655,9 @@ async function startCam() {
 
 function stopCam() {
   running = false;
-  if (rafId)   { cancelAnimationFrame(rafId); rafId = null; }
-  if (mpH)     { mpH.close(); mpH = null; }
-  if (stream)  { stream.getTracks().forEach(t=>t.stop()); stream = null; }
+  if (rafId)          { cancelAnimationFrame(rafId); rafId = null; }
+  if (handLandmarker) { handLandmarker.close(); handLandmarker = null; }
+  if (stream)         { stream.getTracks().forEach(t=>t.stop()); stream = null; }
   document.getElementById('cvs').getContext('2d').clearRect(0,0,9999,9999);
   resetUI();
 }

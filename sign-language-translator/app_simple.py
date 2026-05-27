@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from flask import Flask, request, jsonify, render_template_string, Response
 from flask_cors import CORS
-import os, time, threading
+import os, re, time, threading
 from urllib.request import urlopen
 from pathlib import Path
 
@@ -24,6 +24,23 @@ _MP_FILES = [
 ]
 _mp_status = {'ready': False, 'done': 0, 'total': len(_MP_FILES)}
 
+_ASSERT_PAT = re.compile(
+    r'Object\.getOwnPropertyDescriptor\(Module,\s*["\']arguments["\']\)'
+)
+
+def _patch_mp(fname, raw):
+    """Replace Emscripten assert that conflicts with hands.js Module.arguments usage."""
+    if fname in ('hands_solution_simd_wasm_bin.js', 'hands_solution_wasm_bin.js'):
+        try:
+            text = raw.decode('utf-8')
+            patched = _ASSERT_PAT.sub('false', text)
+            if patched != text:
+                print(f'[MP] patched assertion in {fname}')
+            return patched.encode('utf-8')
+        except Exception as e:
+            print(f'[MP] patch error {fname}: {e}')
+    return raw
+
 def _download_mp():
     _MP_DIR.mkdir(exist_ok=True)
     for url, fname in _MP_FILES:
@@ -31,12 +48,17 @@ def _download_mp():
         if dest.exists() and dest.stat().st_size > 100:
             _mp_status['done'] += 1
             continue
-        try:
-            with urlopen(url, timeout=60) as r:
-                dest.write_bytes(r.read())
-            _mp_status['done'] += 1
-        except Exception as e:
-            print(f'[MP] download failed {fname}: {e}')
+        for attempt in range(3):
+            try:
+                with urlopen(url, timeout=90) as r:
+                    data = _patch_mp(fname, r.read())
+                dest.write_bytes(data)
+                _mp_status['done'] += 1
+                break
+            except Exception as e:
+                print(f'[MP] download failed {fname} attempt {attempt+1}: {e}')
+                if attempt < 2:
+                    time.sleep(2 ** attempt)
     _mp_status['ready'] = True
     print(f'[MP] ready — {_mp_status["done"]}/{_mp_status["total"]} files in {_MP_DIR}')
 
@@ -583,7 +605,7 @@ async function ensureMP() {
   appLog('info', 'Chargement MediaPipe…');
   document.getElementById('liveConf').textContent = 'Chargement MediaPipe…';
   try {
-    var ok = await _waitReady(60);
+    var ok = await _waitReady(180);
     if (ok) {
       await _loadScript('/mp/hands.js');
       await _loadScript('/mp/drawing_utils.js');
@@ -592,11 +614,11 @@ async function ensureMP() {
       return;
     }
   } catch(e) { appLog('warn', 'Local échoué: ' + e.message); }
-  // CDN fallback
-  appLog('warn', 'Fallback CDN jsDelivr…');
+  // CDN fallback — pinned version to avoid broken latest
+  appLog('warn', 'Fallback CDN unpkg (version fixée)…');
   document.getElementById('liveConf').textContent = 'Fallback CDN…';
-  await _loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js');
-  await _loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js');
+  await _loadScript('https://unpkg.com/@mediapipe/hands@0.4.1646424915/hands.js');
+  await _loadScript('https://unpkg.com/@mediapipe/drawing_utils@0.3.1620248257/drawing_utils.js');
   _useLocal = false; _mpLoaded = true;
   appLog('ok', 'MediaPipe CDN chargé (fallback)');
 }
@@ -657,7 +679,8 @@ async function startCam() {
 
   mpH = new Hands({ locateFile: function(f) {
     var file = (simdOk || !f.includes('simd')) ? f : f.replace('simd_wasm_bin','wasm_bin');
-    return _useLocal ? '/mp/' + file : 'https://cdn.jsdelivr.net/npm/@mediapipe/hands/' + file;
+    return _useLocal ? '/mp/' + file
+      : 'https://unpkg.com/@mediapipe/hands@0.4.1646424915/' + file;
   }});
   mpH.setOptions({ maxNumHands:1, modelComplexity:0, minDetectionConfidence:.55, minTrackingConfidence:.4 });
 
@@ -686,14 +709,24 @@ async function startCam() {
   });
 
   running = true;
-  let lastTs = 0;
+  let lastTs = 0, errCount = 0;
   const FRAME_MS = 1000 / 20; // 20 fps
   function loop(ts) {
     if (!running) return;
     rafId = requestAnimationFrame(loop); // schedule FIRST — non-blocking on iOS
     if (ts - lastTs >= FRAME_MS && vid.readyState >= 2) {
       lastTs = ts;
-      mpH.send({ image: vid }); // fire-and-forget, no await
+      try {
+        mpH.send({ image: vid });
+        errCount = 0;
+      } catch(e) {
+        errCount++;
+        if (errCount === 1) appLog('err', 'mpH.send erreur: ' + e.message);
+        if (errCount >= 10) {
+          appLog('err', 'Trop d\'erreurs — arrêt de la détection. Rechargez la page.');
+          stopCam(); return;
+        }
+      }
     }
   }
   rafId = requestAnimationFrame(loop);

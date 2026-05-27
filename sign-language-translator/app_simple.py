@@ -176,6 +176,23 @@ hr{border:none;border-top:2px solid #f0f0f0;margin:1.25rem 0}
 .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:rot .7s linear infinite;vertical-align:middle}
 @keyframes rot{to{transform:rotate(360deg)}}
 .dbg{position:absolute;top:8px;left:8px;background:rgba(0,0,0,.6);color:#0f0;font-size:11px;font-family:monospace;padding:6px 8px;border-radius:6px;line-height:1.6;display:none}
+
+/* Log panel */
+.log-panel{margin-top:1rem;border:1.5px solid #e0e0e0;border-radius:10px;overflow:hidden}
+.log-header{display:flex;align-items:center;justify-content:space-between;padding:.5rem .75rem;background:#f5f5f5;cursor:pointer;user-select:none}
+.log-header span{font-size:12px;font-weight:700;color:#555}
+.log-toggle{font-size:11px;color:#888}
+.log-body{display:none;background:#1a1a2e;padding:.6rem;max-height:200px;overflow-y:auto}
+.log-body.open{display:block}
+.log-entry{font-family:monospace;font-size:10px;line-height:1.6;padding:1px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.log-entry.info{color:#90cdf4}
+.log-entry.ok{color:#68d391}
+.log-entry.warn{color:#f6e05e}
+.log-entry.err{color:#fc8181}
+.log-actions{display:flex;gap:.5rem;padding:.5rem .75rem;background:#f9f9f9;border-top:1px solid #eee}
+.log-btn{flex:1;padding:.4rem;border:1px solid #ddd;border-radius:6px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#555}
+.log-btn:hover{background:#f0eeff;color:#667eea;border-color:#c4b5f4}
+
 @media(max-width:720px){body{padding:0}.app{border-radius:0}.pane{padding:1rem}.controls{grid-template-columns:1fr}.metrics{grid-template-columns:1fr 1fr}.sprops{grid-template-columns:1fr}.cam-grid{grid-template-columns:1fr}}
 </style>
 </head>
@@ -272,6 +289,18 @@ hr{border:none;border-top:2px solid #f0f0f0;margin:1.25rem 0}
 
       <h3 style="margin-bottom:.5rem">Signes reconnus</h3>
       <div class="ref-grid" id="refGrid"></div>
+
+      <div class="log-panel">
+        <div class="log-header" onclick="toggleLog()">
+          <span>📋 Logs de diagnostic</span>
+          <span class="log-toggle" id="logToggleIcon">▼ ouvrir</span>
+        </div>
+        <div class="log-body" id="logBody"></div>
+        <div class="log-actions" id="logActions" style="display:none">
+          <button class="log-btn" onclick="copyLogs()">📋 Copier</button>
+          <button class="log-btn" onclick="clearLogs()">🗑 Effacer</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -348,6 +377,49 @@ function clearText() {
 document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('inputText').addEventListener('keydown',e=>{if(e.key==='Enter'&&e.ctrlKey)doTranslate()});
   buildRefGrid();
+  appLog('info', 'Page chargée — ' + navigator.userAgent.substring(0,80));
+});
+
+/* ─── Log panel ─────────────────────────────────────────────── */
+var _logs = [];
+function appLog(type, msg) {
+  var t = new Date().toTimeString().substring(0,8);
+  var entry = '[' + t + '] ' + msg;
+  _logs.push(entry);
+  if (_logs.length > 120) _logs.shift();
+  var body = document.getElementById('logBody');
+  if (!body) return;
+  var div = document.createElement('div');
+  div.className = 'log-entry ' + (type || 'info');
+  div.textContent = entry;
+  body.appendChild(div);
+  body.scrollTop = body.scrollHeight;
+}
+function toggleLog() {
+  var body = document.getElementById('logBody');
+  var icon = document.getElementById('logToggleIcon');
+  var actions = document.getElementById('logActions');
+  var open = body.classList.toggle('open');
+  icon.textContent = open ? '▲ fermer' : '▼ ouvrir';
+  if (actions) actions.style.display = open ? 'flex' : 'none';
+}
+function copyLogs() {
+  var text = _logs.join('\n');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function() { alert('Logs copiés ! Envoie-les au développeur.'); });
+  } else {
+    prompt('Copie ce texte :', text);
+  }
+}
+function clearLogs() { _logs = []; document.getElementById('logBody').innerHTML = ''; }
+
+// Intercept JS errors
+window.onerror = function(msg, src, line, col, err) {
+  appLog('err', 'JS ERROR: ' + msg + ' (ligne ' + line + ')');
+  return false;
+};
+window.addEventListener('unhandledrejection', function(e) {
+  appLog('err', 'Promise rejetée: ' + (e.reason || e));
 });
 
 /* ═══════════════════════════════════════════════════════════════
@@ -474,52 +546,79 @@ async function startCam() {
   const cvs = document.getElementById('cvs');
   const ctx = cvs.getContext('2d');
 
+  appLog('info', 'Demande accès caméra…');
   // Mobile-friendly : pas de dimensions fixes, fallback si facingMode échoue
   try {
     stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: { ideal: 'user' } }, audio: false
     });
+    appLog('ok', 'Caméra OK (facingMode:user)');
   } catch(e1) {
+    appLog('warn', 'facingMode échoué: ' + e1.message + ' — essai sans contrainte');
     try {
       stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-    } catch(e2) { alert('Caméra refusée: ' + e2.message); resetUI(); return; }
+      appLog('ok', 'Caméra OK (sans contrainte)');
+    } catch(e2) {
+      appLog('err', 'Caméra REFUSÉE: ' + e2.message);
+      alert('Caméra refusée: ' + e2.message); resetUI(); return;
+    }
   }
 
   vid.srcObject = stream;
   await new Promise(r => { vid.onloadedmetadata = () => r(); setTimeout(r, 4000); });
   try { await vid.play(); } catch(_) {}
+  appLog('ok', 'Vidéo: ' + (vid.videoWidth||'?') + 'x' + (vid.videoHeight||'?') + ' readyState=' + vid.readyState);
 
   const setSize = () => { cvs.width = vid.videoWidth || 640; cvs.height = vid.videoHeight || 480; };
   setSize();
   vid.addEventListener('resize', setSize);
 
   document.getElementById('liveConf').textContent = 'Chargement modèle IA…';
+  appLog('info', 'Chargement MediaPipe Hands…');
 
-  mpH = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${f}` });
+  mpH = new Hands({ locateFile: f => {
+    var url = 'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/' + f;
+    appLog('info', 'CDN: ' + f);
+    return url;
+  }});
   mpH.setOptions({ maxNumHands:1, modelComplexity:0, minDetectionConfidence:.5, minTrackingConfidence:.35 });
 
+  var frameCount = 0, detectCount = 0;
   mpH.onResults(res => {
+    frameCount++;
     ctx.clearRect(0, 0, cvs.width, cvs.height);
-    if (res.multiHandLandmarks?.length) {
-      const lm = res.multiHandLandmarks[0];
+    if (res.multiHandLandmarks && res.multiHandLandmarks.length) {
+      detectCount++;
+      var lm = res.multiHandLandmarks[0];
       drawConnectors(ctx, lm, HAND_CONNECTIONS, { color:'#667eea', lineWidth:2 });
       drawLandmarks(ctx,  lm, { color:'#fff', fillColor:'#764ba2', radius:3 });
 
-      const { sign, conf } = classify(lm);
+      var result = classify(lm);
+      var sign = result.sign, conf = result.conf;
+
+      // Log chaque 30 frames avec détection
+      if (detectCount % 30 === 1) {
+        var f = getStates(lm);
+        appLog('ok', 'Main#' + detectCount + ' T:' + (+f.thumb) + ' I:' + (+f.index) + ' M:' + (+f.middle) + ' R:' + (+f.ring) + ' P:' + (+f.pinky) + ' → ' + (sign ? sign.fr : 'aucun'));
+      }
 
       if (debugOn) {
-        const f = getStates(lm);
+        var f2 = getStates(lm);
         document.getElementById('dbg').innerHTML =
-          `T:${+f.thumb} I:${+f.index} M:${+f.middle} R:${+f.ring} P:${+f.pinky}<br>`+
-          `thumbUp:${+f.thumbUp} dn:${+f.thumbDown}<br>`+
-          `thumbDist:${f.thumbDist.toFixed(3)} palm:${f.palmSz.toFixed(3)}<br>`+
-          `→ ${sign ? sign.fr : '—'}`;
+          'T:' + (+f2.thumb) + ' I:' + (+f2.index) + ' M:' + (+f2.middle) + ' R:' + (+f2.ring) + ' P:' + (+f2.pinky) + '<br>' +
+          'thumbUp:' + (+f2.thumbUp) + ' dn:' + (+f2.thumbDown) + '<br>' +
+          'thumbDist:' + f2.thumbDist.toFixed(3) + ' palm:' + f2.palmSz.toFixed(3) + '<br>' +
+          (sign ? sign.fr : '—');
       }
       onDetect(sign, conf);
     } else {
       onDetect(null, 0);
+      // Log "pas de main" toutes les 60 frames
+      if (frameCount % 60 === 0) appLog('warn', 'Frame#' + frameCount + ' — aucune main détectée');
       if (debugOn) document.getElementById('dbg').innerHTML = 'Aucune main détectée';
     }
+    // Log au 1er frame reçu
+    if (frameCount === 1) appLog('ok', 'MediaPipe actif — 1er frame reçu');
   });
 
   running = true;
@@ -534,6 +633,7 @@ async function startCam() {
     }
   }
   rafId = requestAnimationFrame(loop);
+  appLog('ok', 'Boucle RAF démarrée');
   document.getElementById('liveConf').textContent = '✅ Actif — montrez un signe !';
 }
 

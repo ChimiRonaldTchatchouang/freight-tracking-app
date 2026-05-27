@@ -224,6 +224,20 @@ hr{border:none;border-top:2px solid #f0f0f0;margin:1.25rem 0}
 .ref-emoji{font-size:18px;display:block;margin-bottom:2px}
 .ref-label{font-weight:700;color:#667eea;font-size:10px}
 .ref-desc{color:#888;font-size:9px;line-height:1.3;margin-top:2px}
+.log-panel{margin-top:1rem;border:1.5px solid #e0e0e0;border-radius:10px;overflow:hidden}
+.log-header{display:flex;align-items:center;justify-content:space-between;padding:.5rem .75rem;background:#f5f5f5;cursor:pointer;user-select:none}
+.log-header span{font-size:12px;font-weight:700;color:#555}
+.log-toggle{font-size:11px;color:#888}
+.log-body{display:none;background:#1a1a2e;padding:.6rem;max-height:220px;overflow-y:auto}
+.log-body.open{display:block}
+.log-entry{font-family:monospace;font-size:10px;line-height:1.6;padding:1px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.log-entry.info{color:#90cdf4}.log-entry.ok{color:#68d391}.log-entry.warn{color:#f6e05e}.log-entry.err{color:#fc8181}
+.log-actions{display:flex;gap:.5rem;padding:.5rem .75rem;background:#f9f9f9;border-top:1px solid #eee}
+.log-btn{flex:1;padding:.4rem;border:1px solid #ddd;border-radius:6px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#555}
+.log-btn:hover{background:#f0eeff;color:#667eea;border-color:#c4b5f4}
+.ref-emoji{font-size:18px;display:block;margin-bottom:2px}
+.ref-label{font-weight:700;color:#667eea;font-size:10px}
+.ref-desc{color:#888;font-size:9px;line-height:1.3;margin-top:2px}
 
 .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:rot .7s linear infinite;vertical-align:middle}
 @keyframes rot{to{transform:rotate(360deg)}}
@@ -324,6 +338,18 @@ hr{border:none;border-top:2px solid #f0f0f0;margin:1.25rem 0}
 
       <h3 style="margin-bottom:.5rem">Signes reconnus</h3>
       <div class="ref-grid" id="refGrid"></div>
+
+      <div class="log-panel">
+        <div class="log-header" onclick="toggleLog()">
+          <span>📋 Logs de diagnostic</span>
+          <span class="log-toggle" id="logToggleIcon">▼ ouvrir</span>
+        </div>
+        <div class="log-body" id="logBody"></div>
+        <div class="log-actions" id="logActions" style="display:none">
+          <button class="log-btn" onclick="copyLogs()">📋 Copier</button>
+          <button class="log-btn" onclick="clearLogs()">🗑 Effacer</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -487,6 +513,47 @@ function classify(lm) {
   return { sign: null, conf: 0 };
 }
 
+// ── Log panel ────────────────────────────────────────────────────
+var _logs = [];
+function appLog(type, msg) {
+  var t = new Date().toTimeString().substring(0,8);
+  var entry = '[' + t + '] ' + msg;
+  _logs.push(entry);
+  if (_logs.length > 150) _logs.shift();
+  var body = document.getElementById('logBody');
+  if (!body) return;
+  var div = document.createElement('div');
+  div.className = 'log-entry ' + (type||'info');
+  div.textContent = entry;
+  body.appendChild(div);
+  body.scrollTop = body.scrollHeight;
+}
+function toggleLog() {
+  var body = document.getElementById('logBody');
+  var icon = document.getElementById('logToggleIcon');
+  var actions = document.getElementById('logActions');
+  var open = body.classList.toggle('open');
+  icon.textContent = open ? '▲ fermer' : '▼ ouvrir';
+  if (actions) actions.style.display = open ? 'flex' : 'none';
+}
+function copyLogs() {
+  var text = _logs.join('\n');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function(){ alert('Logs copiés !'); });
+  } else { prompt('Copie ce texte :', text); }
+}
+function clearLogs() { _logs = []; document.getElementById('logBody').innerHTML = ''; }
+window.onerror = function(msg, src, line, col, err) {
+  appLog('err', 'JS ERROR: ' + msg + ' (ligne ' + line + ')');
+  return false;
+};
+window.addEventListener('unhandledrejection', function(e) {
+  appLog('err', 'Promise rejetée: ' + (e.reason || e));
+});
+document.addEventListener('DOMContentLoaded', function() {
+  appLog('info', 'Page chargée — ' + navigator.userAgent.substring(0,80));
+});
+
 // ── MediaPipe loader — self-hosted first, CDN fallback ──────────
 var _mpLoaded = false, _useLocal = false;
 
@@ -513,6 +580,7 @@ async function _waitReady(maxSec) {
 
 async function ensureMP() {
   if (_mpLoaded) return;
+  appLog('info', 'Chargement MediaPipe…');
   document.getElementById('liveConf').textContent = 'Chargement MediaPipe…';
   try {
     var ok = await _waitReady(60);
@@ -520,14 +588,17 @@ async function ensureMP() {
       await _loadScript('/mp/hands.js');
       await _loadScript('/mp/drawing_utils.js');
       _useLocal = true; _mpLoaded = true;
+      appLog('ok', 'MediaPipe local chargé ✓');
       return;
     }
-  } catch(e) {}
+  } catch(e) { appLog('warn', 'Local échoué: ' + e.message); }
   // CDN fallback
+  appLog('warn', 'Fallback CDN jsDelivr…');
   document.getElementById('liveConf').textContent = 'Fallback CDN…';
   await _loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js');
   await _loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js');
   _useLocal = false; _mpLoaded = true;
+  appLog('ok', 'MediaPipe CDN chargé (fallback)');
 }
 
 // ── Camera logic ────────────────────────────────────────────────

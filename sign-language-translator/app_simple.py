@@ -92,7 +92,9 @@ HTML = r"""<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Traducteur LSF</title>
-<!-- @mediapipe/tasks-vision chargé dynamiquement dans startCam() -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:linear-gradient(135deg,#667eea,#764ba2);min-height:100vh;padding:1.5rem}
@@ -174,23 +176,6 @@ hr{border:none;border-top:2px solid #f0f0f0;margin:1.25rem 0}
 .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:rot .7s linear infinite;vertical-align:middle}
 @keyframes rot{to{transform:rotate(360deg)}}
 .dbg{position:absolute;top:8px;left:8px;background:rgba(0,0,0,.6);color:#0f0;font-size:11px;font-family:monospace;padding:6px 8px;border-radius:6px;line-height:1.6;display:none}
-
-/* Log panel */
-.log-panel{margin-top:1rem;border:1.5px solid #e0e0e0;border-radius:10px;overflow:hidden}
-.log-header{display:flex;align-items:center;justify-content:space-between;padding:.5rem .75rem;background:#f5f5f5;cursor:pointer;user-select:none}
-.log-header span{font-size:12px;font-weight:700;color:#555}
-.log-toggle{font-size:11px;color:#888}
-.log-body{display:none;background:#1a1a2e;padding:.6rem;max-height:200px;overflow-y:auto}
-.log-body.open{display:block}
-.log-entry{font-family:monospace;font-size:10px;line-height:1.6;padding:1px 0;border-bottom:1px solid rgba(255,255,255,.05)}
-.log-entry.info{color:#90cdf4}
-.log-entry.ok{color:#68d391}
-.log-entry.warn{color:#f6e05e}
-.log-entry.err{color:#fc8181}
-.log-actions{display:flex;gap:.5rem;padding:.5rem .75rem;background:#f9f9f9;border-top:1px solid #eee}
-.log-btn{flex:1;padding:.4rem;border:1px solid #ddd;border-radius:6px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#555}
-.log-btn:hover{background:#f0eeff;color:#667eea;border-color:#c4b5f4}
-
 @media(max-width:720px){body{padding:0}.app{border-radius:0}.pane{padding:1rem}.controls{grid-template-columns:1fr}.metrics{grid-template-columns:1fr 1fr}.sprops{grid-template-columns:1fr}.cam-grid{grid-template-columns:1fr}}
 </style>
 </head>
@@ -287,18 +272,6 @@ hr{border:none;border-top:2px solid #f0f0f0;margin:1.25rem 0}
 
       <h3 style="margin-bottom:.5rem">Signes reconnus</h3>
       <div class="ref-grid" id="refGrid"></div>
-
-      <div class="log-panel">
-        <div class="log-header" onclick="toggleLog()">
-          <span>📋 Logs de diagnostic</span>
-          <span class="log-toggle" id="logToggleIcon">▼ ouvrir</span>
-        </div>
-        <div class="log-body" id="logBody"></div>
-        <div class="log-actions" id="logActions" style="display:none">
-          <button class="log-btn" onclick="copyLogs()">📋 Copier</button>
-          <button class="log-btn" onclick="clearLogs()">🗑 Effacer</button>
-        </div>
-      </div>
     </div>
   </div>
 </div>
@@ -375,49 +348,6 @@ function clearText() {
 document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('inputText').addEventListener('keydown',e=>{if(e.key==='Enter'&&e.ctrlKey)doTranslate()});
   buildRefGrid();
-  appLog('info', 'Page chargée — ' + navigator.userAgent.substring(0,80));
-});
-
-/* ─── Log panel ─────────────────────────────────────────────── */
-var _logs = [];
-function appLog(type, msg) {
-  var t = new Date().toTimeString().substring(0,8);
-  var entry = '[' + t + '] ' + msg;
-  _logs.push(entry);
-  if (_logs.length > 120) _logs.shift();
-  var body = document.getElementById('logBody');
-  if (!body) return;
-  var div = document.createElement('div');
-  div.className = 'log-entry ' + (type || 'info');
-  div.textContent = entry;
-  body.appendChild(div);
-  body.scrollTop = body.scrollHeight;
-}
-function toggleLog() {
-  var body = document.getElementById('logBody');
-  var icon = document.getElementById('logToggleIcon');
-  var actions = document.getElementById('logActions');
-  var open = body.classList.toggle('open');
-  icon.textContent = open ? '▲ fermer' : '▼ ouvrir';
-  if (actions) actions.style.display = open ? 'flex' : 'none';
-}
-function copyLogs() {
-  var text = _logs.join('\n');
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(function() { alert('Logs copiés ! Envoie-les au développeur.'); });
-  } else {
-    prompt('Copie ce texte :', text);
-  }
-}
-function clearLogs() { _logs = []; document.getElementById('logBody').innerHTML = ''; }
-
-// Intercept JS errors
-window.onerror = function(msg, src, line, col, err) {
-  appLog('err', 'JS ERROR: ' + msg + ' (ligne ' + line + ')');
-  return false;
-};
-window.addEventListener('unhandledrejection', function(e) {
-  appLog('err', 'Promise rejetée: ' + (e.reason || e));
 });
 
 /* ═══════════════════════════════════════════════════════════════
@@ -455,34 +385,24 @@ function buildRefGrid() {
 function dist2(a,b){ return Math.sqrt((a.x-b.x)**2+(a.y-b.y)**2); }
 
 function getStates(lm) {
-  // Y-coordinate detection: tip above PIP joint → finger extended
-  // Much more reliable for LSF (hand facing camera, fingers pointing up)
-  // lm[y] smaller = higher on screen
-  var index  = lm[8].y  < lm[6].y;   // INDEX  tip above PIP
-  var middle = lm[12].y < lm[10].y;  // MIDDLE tip above PIP
-  var ring   = lm[16].y < lm[14].y;  // RING   tip above PIP
-  var pinky  = lm[20].y < lm[18].y;  // PINKY  tip above PIP
+  // Use distance from wrist: tip farther than pip → extended
+  // Multiply by 1.05 as tolerance
+  const w = lm[0];
+  const index  = dist2(lm[8],w)  > dist2(lm[6],w)  * 1.05;
+  const middle = dist2(lm[12],w) > dist2(lm[10],w) * 1.05;
+  const ring   = dist2(lm[16],w) > dist2(lm[14],w) * 1.05;
+  const pinky  = dist2(lm[20],w) > dist2(lm[18],w) * 1.05;
 
-  // Fallback: also count as extended if tip is far from wrist vs pip
-  // (handles sideways/tilted hand positions)
-  var w = lm[0];
-  if (!index  && dist2(lm[8],w)  > dist2(lm[6],w)  * 1.3) index  = true;
-  if (!middle && dist2(lm[12],w) > dist2(lm[10],w) * 1.3) middle = true;
-  if (!ring   && dist2(lm[16],w) > dist2(lm[14],w) * 1.3) ring   = true;
-  if (!pinky  && dist2(lm[20],w) > dist2(lm[18],w) * 1.3) pinky  = true;
+  // Thumb: tip far from index MCP = extended
+  const palmSz = dist2(lm[0], lm[9]);
+  const thumbDist = dist2(lm[4], lm[5]);
+  const thumb = thumbDist > palmSz * 0.5;
 
-  // Thumb: distance-based (thumb extends sideways, not up)
-  var palmSz    = dist2(lm[0], lm[9]);
-  var thumbDist = dist2(lm[4], lm[5]);
-  var thumb     = thumbDist > palmSz * 0.5;
+  // Thumb direction for thumbs up / down
+  const thumbUp   = lm[4].y < lm[2].y - 0.03;
+  const thumbDown = lm[4].y > lm[2].y + 0.03;
 
-  // Thumb direction
-  var thumbUp   = lm[4].y < lm[2].y - 0.03;
-  var thumbDown = lm[4].y > lm[2].y + 0.03;
-
-  return { thumb: thumb, thumbUp: thumbUp, thumbDown: thumbDown,
-           index: index, middle: middle, ring: ring, pinky: pinky,
-           palmSz: palmSz, thumbDist: thumbDist };
+  return { thumb, thumbUp, thumbDown, index, middle, ring, pinky, palmSz, thumbDist };
 }
 
 function classify(lm) {
@@ -516,7 +436,7 @@ function classify(lm) {
 }
 
 // ── Camera logic ────────────────────────────────────────────────
-let handLandmarker = null, rafId = null, stream = null, running = false;
+let mpH = null, rafId = null, stream = null, running = false;
 let holdKey = null, holdStart = 0, cooldownUntil = 0;
 const HOLD_MS = 1000;
 let sentence = [];
@@ -528,6 +448,7 @@ function toggleDebug() {
 }
 
 async function startCam() {
+  // Déverrouiller la synthèse vocale dans le geste utilisateur (obligatoire iOS)
   try {
     const u = new SpeechSynthesisUtterance(' ');
     u.volume = 0.01; u.lang = 'fr-FR';
@@ -543,121 +464,74 @@ async function startCam() {
   const cvs = document.getElementById('cvs');
   const ctx = cvs.getContext('2d');
 
-  appLog('info', 'Demande accès caméra…');
+  // Mobile-friendly : pas de dimensions fixes, fallback si facingMode échoue
   try {
     stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: { ideal: 'user' } }, audio: false
     });
-    appLog('ok', 'Caméra OK (facingMode:user)');
   } catch(e1) {
-    appLog('warn', 'facingMode échoué: ' + e1.message + ' — essai sans contrainte');
     try {
       stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-      appLog('ok', 'Caméra OK (sans contrainte)');
-    } catch(e2) {
-      appLog('err', 'Caméra REFUSÉE: ' + e2.message);
-      alert('Caméra refusée: ' + e2.message); resetUI(); return;
-    }
+    } catch(e2) { alert('Caméra refusée: ' + e2.message); resetUI(); return; }
   }
 
   vid.srcObject = stream;
   await new Promise(r => { vid.onloadedmetadata = () => r(); setTimeout(r, 4000); });
   try { await vid.play(); } catch(_) {}
-  appLog('ok', 'Vidéo: ' + (vid.videoWidth||'?') + 'x' + (vid.videoHeight||'?') + ' readyState=' + vid.readyState);
 
   const setSize = () => { cvs.width = vid.videoWidth || 640; cvs.height = vid.videoHeight || 480; };
   setSize();
   vid.addEventListener('resize', setSize);
 
   document.getElementById('liveConf').textContent = 'Chargement modèle IA…';
-  appLog('info', 'Chargement @mediapipe/tasks-vision (API moderne)…');
 
-  var hlInst, drawInst, HAND_CONNS;
-  try {
-    // Modern MediaPipe Tasks Vision — handles SIMD/non-SIMD automatically
-    var tv = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3');
-    var HandLandmarker = tv.HandLandmarker;
-    var FilesetResolver = tv.FilesetResolver;
-    var DrawingUtils    = tv.DrawingUtils;
-    HAND_CONNS = HandLandmarker.HAND_CONNECTIONS;
-    appLog('ok', 'Module chargé');
+  mpH = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
+  mpH.setOptions({ maxNumHands:1, modelComplexity:0, minDetectionConfidence:.55, minTrackingConfidence:.4 });
 
-    var fs = await FilesetResolver.forVisionTasks(
-      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm'
-    );
-    appLog('ok', 'WASM résolu');
-
-    hlInst = await HandLandmarker.createFromOptions(fs, {
-      baseOptions: {
-        modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
-        delegate: 'CPU'
-      },
-      runningMode: 'VIDEO',
-      numHands: 1
-    });
-    handLandmarker = hlInst;
-    drawInst = new DrawingUtils(ctx);
-    appLog('ok', 'HandLandmarker prêt ✓');
-  } catch(e) {
-    appLog('err', 'Erreur init MediaPipe: ' + (e.message || e));
-    alert('Erreur MediaPipe Tasks: ' + (e.message || e));
-    resetUI(); return;
-  }
-
-  running = true;
-  var frameCount = 0, detectCount = 0, lastTs = 0;
-  const FRAME_MS = 1000 / 20;
-
-  function loop(ts) {
-    if (!running) return;
-    rafId = requestAnimationFrame(loop);
-    if (ts - lastTs < FRAME_MS || vid.readyState < 2) return;
-    lastTs = ts;
-    frameCount++;
-
+  mpH.onResults(res => {
     ctx.clearRect(0, 0, cvs.width, cvs.height);
-    var res = hlInst.detectForVideo(vid, ts);
+    if (res.multiHandLandmarks?.length) {
+      const lm = res.multiHandLandmarks[0];
+      drawConnectors(ctx, lm, HAND_CONNECTIONS, { color:'#667eea', lineWidth:2 });
+      drawLandmarks(ctx,  lm, { color:'#fff', fillColor:'#764ba2', radius:3 });
 
-    if (res.landmarks && res.landmarks.length > 0) {
-      detectCount++;
-      var lm = res.landmarks[0];
-      drawInst.drawConnectors(lm, HAND_CONNS, { color:'#667eea', lineWidth:2 });
-      drawInst.drawLandmarks(lm, { color:'#fff', fillColor:'#764ba2', radius:3 });
+      const { sign, conf } = classify(lm);
 
-      var result = classify(lm);
-      var sign = result.sign, conf = result.conf;
-
-      if (detectCount % 30 === 1) {
-        var f = getStates(lm);
-        appLog('ok', 'Main#' + detectCount + ' T:' + (+f.thumb) + ' I:' + (+f.index) + ' M:' + (+f.middle) + ' R:' + (+f.ring) + ' P:' + (+f.pinky) + ' → ' + (sign ? sign.fr : 'aucun'));
-      }
       if (debugOn) {
-        var f2 = getStates(lm);
+        const f = getStates(lm);
         document.getElementById('dbg').innerHTML =
-          'T:' + (+f2.thumb) + ' I:' + (+f2.index) + ' M:' + (+f2.middle) + ' R:' + (+f2.ring) + ' P:' + (+f2.pinky) + '<br>' +
-          'thumbUp:' + (+f2.thumbUp) + ' dn:' + (+f2.thumbDown) + '<br>' +
-          'thumbDist:' + f2.thumbDist.toFixed(3) + ' palm:' + f2.palmSz.toFixed(3) + '<br>' +
-          (sign ? sign.fr : '—');
+          `T:${+f.thumb} I:${+f.index} M:${+f.middle} R:${+f.ring} P:${+f.pinky}<br>`+
+          `thumbUp:${+f.thumbUp} dn:${+f.thumbDown}<br>`+
+          `thumbDist:${f.thumbDist.toFixed(3)} palm:${f.palmSz.toFixed(3)}<br>`+
+          `→ ${sign ? sign.fr : '—'}`;
       }
       onDetect(sign, conf);
     } else {
       onDetect(null, 0);
-      if (frameCount % 60 === 0) appLog('warn', 'Frame#' + frameCount + ' — aucune main détectée');
       if (debugOn) document.getElementById('dbg').innerHTML = 'Aucune main détectée';
     }
-    if (frameCount === 1) appLog('ok', 'MediaPipe actif — 1er frame reçu ✓');
-  }
+  });
 
+  running = true;
+  let lastTs = 0;
+  const FRAME_MS = 1000 / 20; // 20 fps
+  function loop(ts) {
+    if (!running) return;
+    rafId = requestAnimationFrame(loop); // schedule FIRST — non-blocking on iOS
+    if (ts - lastTs >= FRAME_MS && vid.readyState >= 2) {
+      lastTs = ts;
+      mpH.send({ image: vid }); // fire-and-forget, no await
+    }
+  }
   rafId = requestAnimationFrame(loop);
-  appLog('ok', 'Boucle RAF démarrée');
   document.getElementById('liveConf').textContent = '✅ Actif — montrez un signe !';
 }
 
 function stopCam() {
   running = false;
-  if (rafId)          { cancelAnimationFrame(rafId); rafId = null; }
-  if (handLandmarker) { handLandmarker.close(); handLandmarker = null; }
-  if (stream)         { stream.getTracks().forEach(t=>t.stop()); stream = null; }
+  if (rafId)   { cancelAnimationFrame(rafId); rafId = null; }
+  if (mpH)     { mpH.close(); mpH = null; }
+  if (stream)  { stream.getTracks().forEach(t=>t.stop()); stream = null; }
   document.getElementById('cvs').getContext('2d').clearRect(0,0,9999,9999);
   resetUI();
 }

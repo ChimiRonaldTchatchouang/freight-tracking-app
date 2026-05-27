@@ -385,24 +385,34 @@ function buildRefGrid() {
 function dist2(a,b){ return Math.sqrt((a.x-b.x)**2+(a.y-b.y)**2); }
 
 function getStates(lm) {
-  // Use distance from wrist: tip farther than pip → extended
-  // Multiply by 1.05 as tolerance
-  const w = lm[0];
-  const index  = dist2(lm[8],w)  > dist2(lm[6],w)  * 1.05;
-  const middle = dist2(lm[12],w) > dist2(lm[10],w) * 1.05;
-  const ring   = dist2(lm[16],w) > dist2(lm[14],w) * 1.05;
-  const pinky  = dist2(lm[20],w) > dist2(lm[18],w) * 1.05;
+  // Y-coordinate detection: tip above PIP joint → finger extended
+  // Much more reliable for LSF (hand facing camera, fingers pointing up)
+  // lm[y] smaller = higher on screen
+  var index  = lm[8].y  < lm[6].y;   // INDEX  tip above PIP
+  var middle = lm[12].y < lm[10].y;  // MIDDLE tip above PIP
+  var ring   = lm[16].y < lm[14].y;  // RING   tip above PIP
+  var pinky  = lm[20].y < lm[18].y;  // PINKY  tip above PIP
 
-  // Thumb: tip far from index MCP = extended
-  const palmSz = dist2(lm[0], lm[9]);
-  const thumbDist = dist2(lm[4], lm[5]);
-  const thumb = thumbDist > palmSz * 0.5;
+  // Fallback: also count as extended if tip is far from wrist vs pip
+  // (handles sideways/tilted hand positions)
+  var w = lm[0];
+  if (!index  && dist2(lm[8],w)  > dist2(lm[6],w)  * 1.3) index  = true;
+  if (!middle && dist2(lm[12],w) > dist2(lm[10],w) * 1.3) middle = true;
+  if (!ring   && dist2(lm[16],w) > dist2(lm[14],w) * 1.3) ring   = true;
+  if (!pinky  && dist2(lm[20],w) > dist2(lm[18],w) * 1.3) pinky  = true;
 
-  // Thumb direction for thumbs up / down
-  const thumbUp   = lm[4].y < lm[2].y - 0.03;
-  const thumbDown = lm[4].y > lm[2].y + 0.03;
+  // Thumb: distance-based (thumb extends sideways, not up)
+  var palmSz    = dist2(lm[0], lm[9]);
+  var thumbDist = dist2(lm[4], lm[5]);
+  var thumb     = thumbDist > palmSz * 0.5;
 
-  return { thumb, thumbUp, thumbDown, index, middle, ring, pinky, palmSz, thumbDist };
+  // Thumb direction
+  var thumbUp   = lm[4].y < lm[2].y - 0.03;
+  var thumbDown = lm[4].y > lm[2].y + 0.03;
+
+  return { thumb: thumb, thumbUp: thumbUp, thumbDown: thumbDown,
+           index: index, middle: middle, ring: ring, pinky: pinky,
+           palmSz: palmSz, thumbDist: thumbDist };
 }
 
 function classify(lm) {
@@ -486,7 +496,7 @@ async function startCam() {
   document.getElementById('liveConf').textContent = 'Chargement modèle IA…';
 
   mpH = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${f}` });
-  mpH.setOptions({ maxNumHands:1, modelComplexity:0, minDetectionConfidence:.55, minTrackingConfidence:.4 });
+  mpH.setOptions({ maxNumHands:1, modelComplexity:0, minDetectionConfidence:.5, minTrackingConfidence:.35 });
 
   mpH.onResults(res => {
     ctx.clearRect(0, 0, cvs.width, cvs.height);

@@ -574,12 +574,21 @@ async function startCam() {
   vid.addEventListener('resize', setSize);
 
   document.getElementById('liveConf').textContent = 'Chargement modèle IA…';
-  appLog('info', 'Chargement MediaPipe Hands…');
+
+  // SIMD WebAssembly detection — not supported on iOS < 16.4 and some Android browsers
+  var simdOk = false;
+  try {
+    simdOk = WebAssembly.validate(new Uint8Array([
+      0,97,115,109,1,0,0,0,1,5,1,96,0,1,123,3,2,1,0,10,10,1,8,0,65,0,253,15,253,98,11
+    ]));
+  } catch(e) { simdOk = false; }
+  appLog('info', 'SIMD WASM: ' + (simdOk ? 'supporté ✓' : 'non supporté → fallback non-SIMD'));
 
   mpH = new Hands({ locateFile: f => {
-    var url = 'https://unpkg.com/@mediapipe/hands@0.4.1646424915/' + f;
-    appLog('info', 'CDN: ' + f);
-    return url;
+    // Redirect SIMD files to non-SIMD equivalents when not supported
+    var file = (simdOk || !f.includes('simd')) ? f : f.replace('simd_wasm_bin', 'wasm_bin');
+    appLog('info', 'CDN: ' + file);
+    return 'https://unpkg.com/@mediapipe/hands@0.4.1646424915/' + file;
   }});
   mpH.setOptions({ maxNumHands:1, modelComplexity:0, minDetectionConfidence:.5, minTrackingConfidence:.35 });
 

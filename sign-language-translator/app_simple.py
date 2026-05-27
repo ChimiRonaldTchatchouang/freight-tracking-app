@@ -1,10 +1,64 @@
 #!/usr/bin/env python3
-from flask import Flask, request, jsonify, render_template_string
+from flask import Flask, request, jsonify, render_template_string, Response
 from flask_cors import CORS
-import os, time
+import os, time, threading
+from urllib.request import urlopen
+from pathlib import Path
 
 app = Flask(__name__)
 CORS(app)
+
+# ── Self-host MediaPipe files — download once at startup, serve same-origin ──
+_MP_VER = '0.4.1646424915'
+_DU_VER = '0.3.1620248257'
+_MP_DIR = Path('/tmp/mp_cache')
+_MP_FILES = [
+    (f'https://unpkg.com/@mediapipe/hands@{_MP_VER}/hands.js',                              'hands.js'),
+    (f'https://unpkg.com/@mediapipe/hands@{_MP_VER}/hands_solution_packed_assets_loader.js','hands_solution_packed_assets_loader.js'),
+    (f'https://unpkg.com/@mediapipe/hands@{_MP_VER}/hands_solution_packed_assets.data',     'hands_solution_packed_assets.data'),
+    (f'https://unpkg.com/@mediapipe/hands@{_MP_VER}/hands_solution_simd_wasm_bin.js',       'hands_solution_simd_wasm_bin.js'),
+    (f'https://unpkg.com/@mediapipe/hands@{_MP_VER}/hands_solution_simd_wasm_bin.wasm',     'hands_solution_simd_wasm_bin.wasm'),
+    (f'https://unpkg.com/@mediapipe/hands@{_MP_VER}/hands_solution_wasm_bin.js',            'hands_solution_wasm_bin.js'),
+    (f'https://unpkg.com/@mediapipe/hands@{_MP_VER}/hands_solution_wasm_bin.wasm',          'hands_solution_wasm_bin.wasm'),
+    (f'https://unpkg.com/@mediapipe/drawing_utils@{_DU_VER}/drawing_utils.js',              'drawing_utils.js'),
+]
+_mp_status = {'ready': False, 'done': 0, 'total': len(_MP_FILES)}
+
+def _download_mp():
+    _MP_DIR.mkdir(exist_ok=True)
+    for url, fname in _MP_FILES:
+        dest = _MP_DIR / fname
+        if dest.exists() and dest.stat().st_size > 100:
+            _mp_status['done'] += 1
+            continue
+        try:
+            with urlopen(url, timeout=60) as r:
+                dest.write_bytes(r.read())
+            _mp_status['done'] += 1
+        except Exception as e:
+            print(f'[MP] download failed {fname}: {e}')
+    _mp_status['ready'] = True
+    print(f'[MP] ready — {_mp_status["done"]}/{_mp_status["total"]} files in {_MP_DIR}')
+
+threading.Thread(target=_download_mp, daemon=True).start()
+
+@app.route('/mp/<path:filename>')
+def serve_mp(filename):
+    f = _MP_DIR / filename
+    if not f.exists():
+        return 'not ready', 503
+    mime = ('application/wasm' if filename.endswith('.wasm')
+            else 'application/javascript; charset=utf-8' if filename.endswith('.js')
+            else 'application/octet-stream')
+    resp = Response(f.read_bytes(), mimetype=mime)
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.headers['Cache-Control'] = 'public, max-age=3600'
+    return resp
+
+@app.route('/mp_status')
+def mp_status_route():
+    return jsonify(_mp_status)
+# ─────────────────────────────────────────────────────────────────────────────
 
 SIGN_MAP = {
     'i':'IX-1','me':'IX-1','my':'IX-1','we':'IX-1PL','you':'IX-2',
@@ -92,9 +146,7 @@ HTML = r"""<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Traducteur LSF</title>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<!-- MediaPipe served from /mp/ (self-hosted, downloaded at startup) -->
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:linear-gradient(135deg,#667eea,#764ba2);min-height:100vh;padding:1.5rem}
@@ -435,6 +487,49 @@ function classify(lm) {
   return { sign: null, conf: 0 };
 }
 
+// ── MediaPipe loader — self-hosted first, CDN fallback ──────────
+var _mpLoaded = false, _useLocal = false;
+
+function _loadScript(src) {
+  return new Promise(function(resolve, reject) {
+    var s = document.createElement('script');
+    s.src = src; s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+async function _waitReady(maxSec) {
+  for (var i = 0; i < maxSec / 2; i++) {
+    try {
+      var st = await fetch('/mp_status').then(function(r){ return r.json(); });
+      if (st.ready) return true;
+      document.getElementById('liveConf').textContent =
+        'Préparation IA: ' + st.done + '/' + st.total + ' fichiers…';
+    } catch(_) {}
+    await new Promise(function(r){ setTimeout(r, 2000); });
+  }
+  return false;
+}
+
+async function ensureMP() {
+  if (_mpLoaded) return;
+  document.getElementById('liveConf').textContent = 'Chargement MediaPipe…';
+  try {
+    var ok = await _waitReady(60);
+    if (ok) {
+      await _loadScript('/mp/hands.js');
+      await _loadScript('/mp/drawing_utils.js');
+      _useLocal = true; _mpLoaded = true;
+      return;
+    }
+  } catch(e) {}
+  // CDN fallback
+  document.getElementById('liveConf').textContent = 'Fallback CDN…';
+  await _loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js');
+  await _loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js');
+  _useLocal = false; _mpLoaded = true;
+}
+
 // ── Camera logic ────────────────────────────────────────────────
 let mpH = null, rafId = null, stream = null, running = false;
 let holdKey = null, holdStart = 0, cooldownUntil = 0;
@@ -483,9 +578,16 @@ async function startCam() {
   setSize();
   vid.addEventListener('resize', setSize);
 
-  document.getElementById('liveConf').textContent = 'Chargement modèle IA…';
+  await ensureMP();
+  document.getElementById('liveConf').textContent = 'Initialisation…';
 
-  mpH = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
+  var simdOk = false;
+  try { simdOk = WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,5,1,96,0,1,123,3,2,1,0,10,10,1,8,0,65,0,253,15,253,98,11])); } catch(_) {}
+
+  mpH = new Hands({ locateFile: function(f) {
+    var file = (simdOk || !f.includes('simd')) ? f : f.replace('simd_wasm_bin','wasm_bin');
+    return _useLocal ? '/mp/' + file : 'https://cdn.jsdelivr.net/npm/@mediapipe/hands/' + file;
+  }});
   mpH.setOptions({ maxNumHands:1, modelComplexity:0, minDetectionConfidence:.55, minTrackingConfidence:.4 });
 
   mpH.onResults(res => {

@@ -27,16 +27,25 @@ _mp_status = {'ready': False, 'done': 0, 'total': len(_MP_FILES)}
 _ASSERT_PAT = re.compile(
     r'Object\.getOwnPropertyDescriptor\(Module,\s*["\']arguments["\']\)'
 )
+# Matches the defineProperty getter: someFunc("Module.arguments has been replaced...")
+# Works even if 'abort' is renamed by the minifier (e.g. 'la', 'ia', etc.)
+_ABORT_ARGS_PAT = re.compile(
+    r'\b\w+\s*\(\s*["\']Module\.arguments has been replaced[^"\']*["\']\s*\)'
+)
 
 def _patch_mp(fname, raw):
-    """Neutralise Emscripten assertion that conflicts with hands.js Module.arguments."""
+    """Neutralise two Emscripten checks that conflict with hands.js Module.arguments."""
     if fname in ('hands_solution_simd_wasm_bin.js', 'hands_solution_wasm_bin.js'):
         try:
             text = raw.decode('utf-8')
-            patched = _ASSERT_PAT.sub('false', text)
-            if patched != text:
-                print(f'[MP] patched assertion in {fname}')
-            return patched.encode('utf-8')
+            # Patch 1: assert(!Object.getOwnPropertyDescriptor(Module,"arguments"),...)
+            p1 = _ASSERT_PAT.sub('false', text)
+            # Patch 2: getter abort("Module.arguments has been replaced...") in defineProperty
+            p2 = _ABORT_ARGS_PAT.sub('(0)', p1)
+            n = (p1 != text) + (p2 != p1)
+            if n:
+                print(f'[MP] patched {n} assertion(s) in {fname}')
+            return p2.encode('utf-8')
         except Exception as e:
             print(f'[MP] patch error {fname}: {e}')
     return raw
@@ -671,15 +680,22 @@ var _blobUrls = [], _wasmAborted = false, _onerrorCount = 0;
 async function _fetchAndPatchJs(url) {
   var fname = url.split('/').pop();
   appLog('info', 'Patch WASM: téléchargement ' + fname + '…');
-  var resp = await fetch(url, { mode: 'cors', cache: 'force-cache' });
+  var resp = await fetch(url, { mode: 'cors', cache: 'no-cache' });
   if (!resp.ok) throw new Error('HTTP ' + resp.status + ' — ' + fname);
   var text = await resp.text();
-  var patched = text.replace(
+  // Patch 1: assert(!Object.getOwnPropertyDescriptor(Module,"arguments"),...)
+  var p1 = text.replace(
     /Object\.getOwnPropertyDescriptor\(Module,\s*["']arguments['"]\)/g, 'false'
   );
-  appLog(patched !== text ? 'ok' : 'warn',
-    'Patch ' + fname + ': ' + (patched !== text ? 'assertion WASM neutralisée ✓' : 'pattern absent (ok si déjà patché)'));
-  var blobUrl = URL.createObjectURL(new Blob([patched], {type: 'application/javascript'}));
+  // Patch 2: defineProperty getter abort("Module.arguments has been replaced...")
+  // Matches even if 'abort' was renamed by the minifier
+  var p2 = p1.replace(
+    /\b\w+\s*\(\s*["']Module\.arguments has been replaced[^"']*['"]\s*\)/g, '(0)'
+  );
+  var nPatches = (p1 !== text ? 1 : 0) + (p2 !== p1 ? 1 : 0);
+  appLog(nPatches > 0 ? 'ok' : 'warn',
+    'Patch ' + fname + ': ' + (nPatches > 0 ? nPatches + ' assertion(s) WASM neutralisée(s) ✓' : 'patterns absents (déjà patchés côté serveur ✓)'));
+  var blobUrl = URL.createObjectURL(new Blob([p2], {type: 'application/javascript'}));
   _blobUrls.push(blobUrl);
   return blobUrl;
 }

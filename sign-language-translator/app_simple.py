@@ -1174,8 +1174,8 @@ async function startCam() {
           var df = bi.domF, nf = bi.nonF;
           document.getElementById('dbgBox').innerHTML =
             '👐 BIMANUEL dist=' + bi.dist.toFixed(2) + '<br>' +
-            'D T:'++(df.thumb)+' I:'++(df.index)+' M:'++(df.middle)+' R:'++(df.ring)+' P:'++(df.pinky)+'<br>' +
-            'G T:'++(nf.thumb)+' I:'++(nf.index)+' M:'++(nf.middle)+' R:'++(nf.ring)+' P:'++(nf.pinky)+'<br>' +
+            'D T:'+(df.thumb|0)+' I:'+(df.index|0)+' M:'+(df.middle|0)+' R:'+(df.ring|0)+' P:'+(df.pinky|0)+'<br>' +
+            'G T:'+(nf.thumb|0)+' I:'+(nf.index|0)+' M:'+(nf.middle|0)+' R:'+(nf.ring|0)+' P:'+(nf.pinky|0)+'<br>' +
             '→ '+bi.sign.fr;
         }
         return;
@@ -1191,8 +1191,8 @@ async function startCam() {
       var f = r.f;
       document.getElementById('dbgBox').innerHTML =
         (handCount >= 2 ? '✋✋ 2 mains (unimanuel)<br>' : '') +
-        'T:'++(f.thumb)+' I:'++(f.index)+' M:'++(f.middle)+' R:'++(f.ring)+' P:'++(f.pinky)+'<br>' +
-        'thumbUp:'++(f.thumbUp)+' dn:'++(f.thumbDown)+'<br>' +
+        'T:'+(f.thumb|0)+' I:'+(f.index|0)+' M:'+(f.middle|0)+' R:'+(f.ring|0)+' P:'+(f.pinky|0)+'<br>' +
+        'thumbUp:'+(f.thumbUp|0)+' dn:'+(f.thumbDown|0)+'<br>' +
         'palmW: '+f.palmW.toFixed(3)+'<br>' +
         '→ '+(r.sign ? r.sign.fr : '—');
     }

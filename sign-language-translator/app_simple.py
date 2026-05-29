@@ -1122,23 +1122,26 @@ async function startCam() {
   } catch(_) {}
   appLog('info', 'SIMD: ' + (simdOk ? 'supporté ✓' : 'non supporté — utilisation du fichier WASM non-SIMD'));
 
-  // Pré-fetch + patch client-side des fichiers WASM JS (neutralise l'assertion Module.arguments)
-  // Ce patch est indispensable aussi bien pour les fichiers locaux que CDN.
-  var wasmBase = _useLocal
-    ? '/mp/'
-    : 'https://unpkg.com/@mediapipe/hands@0.4.1646424915/';
+  // Blob URL patch: only needed for CDN fallback (local files are already patched server-side).
+  // Loading the WASM JS from a Blob URL sets scriptDirectory='' in Emscripten,
+  // which can break the packed-assets loader path resolution.
   var patchedUrls = {};
-  appLog('info', 'Application du patch WASM client-side (' + (simdOk ? 'SIMD + non-SIMD' : 'non-SIMD seulement') + ')…');
-  try {
-    if (simdOk) {
-      patchedUrls['hands_solution_simd_wasm_bin.js'] =
-        await _fetchAndPatchJs(wasmBase + 'hands_solution_simd_wasm_bin.js');
+  if (!_useLocal) {
+    var cdnBase = 'https://unpkg.com/@mediapipe/hands@0.4.1646424915/';
+    appLog('info', 'Mode CDN — patch WASM client-side (' + (simdOk ? 'SIMD + non-SIMD' : 'non-SIMD') + ')…');
+    try {
+      if (simdOk) {
+        patchedUrls['hands_solution_simd_wasm_bin.js'] =
+          await _fetchAndPatchJs(cdnBase + 'hands_solution_simd_wasm_bin.js');
+      }
+      patchedUrls['hands_solution_wasm_bin.js'] =
+        await _fetchAndPatchJs(cdnBase + 'hands_solution_wasm_bin.js');
+      appLog('ok', 'Patch CDN appliqué ✓');
+    } catch(e) {
+      appLog('warn', 'Patch CDN partiel: ' + e.message);
     }
-    patchedUrls['hands_solution_wasm_bin.js'] =
-      await _fetchAndPatchJs(wasmBase + 'hands_solution_wasm_bin.js');
-    appLog('ok', 'Patch WASM client-side appliqué ✓');
-  } catch(e) {
-    appLog('warn', 'Patch client-side partiel: ' + e.message + ' — poursuite sans Blob URL pour ce fichier');
+  } else {
+    appLog('ok', 'Mode local — fichiers WASM déjà patchés côté serveur, Blob URL non utilisé ✓');
   }
 
   mpH = new Hands({
@@ -1147,7 +1150,7 @@ async function startCam() {
       if (!simdOk && f.indexOf('simd_wasm_bin') !== -1) {
         f = f.replace('simd_wasm_bin', 'wasm_bin');
       }
-      // Retourner Blob URL patché si disponible
+      // CDN mode: retourner Blob URL patché si disponible
       if (patchedUrls[f]) return patchedUrls[f];
       return _useLocal
         ? '/mp/' + f

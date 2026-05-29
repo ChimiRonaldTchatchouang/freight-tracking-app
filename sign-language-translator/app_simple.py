@@ -316,11 +316,18 @@ main{padding-top:calc(var(--hh) + 1.25rem);padding-bottom:1.25rem;
 .ref-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.3rem;padding:.6rem}
 .ref-item{
   background:#faf8ff;border:1px solid #e4dcf8;border-radius:7px;
-  padding:.4rem .2rem;text-align:center;cursor:default;transition:background .15s
+  padding:.4rem .2rem;text-align:center;cursor:default;transition:background .15s;position:relative
 }
 .ref-item:hover{background:#ede9fe}
+.ref-item.bi{background:#f0fff4;border-color:#bbf7d0}
+.ref-item.bi:hover{background:#d1fae5}
 .ref-emoji{font-size:18px;display:block}
 .ref-label{font-size:8.5px;font-weight:700;color:var(--brand);line-height:1.3;margin-top:2px;display:block}
+.bi-badge{
+  position:absolute;top:2px;right:2px;
+  background:var(--green);color:#fff;font-size:6px;font-weight:800;
+  padding:0 3px;border-radius:3px;line-height:1.6;letter-spacing:.02em
+}
 
 /* ── TEXT PANE ── */
 .text-card{padding:1.25rem}
@@ -814,6 +821,13 @@ function buildRefGrid() {
     d.innerHTML = '<span class="ref-emoji">' + s.emoji + '</span><span class="ref-label">' + s.fr + '</span>';
     g.appendChild(d);
   });
+  BIMANUAL_SIGNS.forEach(function(s) {
+    var d = document.createElement('div');
+    d.className = 'ref-item bi';
+    d.title = s.desc;
+    d.innerHTML = '<span class="bi-badge">2M</span><span class="ref-emoji">' + s.emoji + '</span><span class="ref-label">' + s.fr + '</span>';
+    g.appendChild(d);
+  });
 }
 
 /* ── HAND CLASSIFICATION ──────────────────────────────── */
@@ -854,6 +868,123 @@ function classify(lm) {
     return { sign: s, conf: 82, f: f };
   }
   return { sign: null, conf: 0, f: f };
+}
+
+/* ── BIMANUAL SIGN DICTIONARY (2 mains simultanées) ─────── */
+// Tiré du Petit Dictionnaire de Laveau (1868) + LSF contemporaine
+// dom = main dominante (droite utilisateur), non = main non-dominante
+// rel: 'close' = poignets proches (<0.35), 'apart' = poignets éloignés (>0.45), 'any' = sans contrainte
+var BIMANUAL_SIGNS = [
+  // ── Du dictionnaire Laveau (1868) ──────────────────────────────────────────
+  { key:'FORT',       emoji:'💪', fr:'FORT',        en:'Strong / Powerful',
+    desc:'Deux poings serrés aux épaules (Laveau: "bien fermer les deux poings")',
+    dom:{thumb:false,index:false,middle:false,ring:false,pinky:false,dir:null},
+    non:{thumb:false,index:false,middle:false,ring:false,pinky:false,dir:null},
+    rel:'any', bimanual:true },
+
+  { key:'MONDE',      emoji:'🌍', fr:'MONDE',       en:'World',
+    desc:'Les deux bras forment un grand cercle, mains ouvertes très écartées (Laveau)',
+    dom:{thumb:true,index:true,middle:true,ring:true,pinky:true,dir:null},
+    non:{thumb:true,index:true,middle:true,ring:true,pinky:true,dir:null},
+    rel:'apart', bimanual:true },
+
+  { key:'PROMETTRE',  emoji:'🤝', fr:'PROMETTRE',   en:'Promise',
+    desc:'Les deux index levés côte à côte (Laveau: "signe de promettre")',
+    dom:{thumb:false,index:true,middle:false,ring:false,pinky:false,dir:null},
+    non:{thumb:false,index:true,middle:false,ring:false,pinky:false,dir:null},
+    rel:'close', bimanual:true },
+
+  // ── LSF contemporaine ───────────────────────────────────────────────────────
+  { key:'EXCELLENT',  emoji:'✨', fr:'EXCELLENT',   en:'Excellent',
+    desc:'Les deux pouces levés vers le haut',
+    dom:{thumb:true,index:false,middle:false,ring:false,pinky:false,dir:'up'},
+    non:{thumb:true,index:false,middle:false,ring:false,pinky:false,dir:'up'},
+    rel:'any', bimanual:true },
+
+  { key:'BRAVO',      emoji:'👏', fr:'BRAVO',       en:'Bravo / Applause',
+    desc:'Les deux mains ouvertes rapprochées — applaudir',
+    dom:{thumb:true,index:true,middle:true,ring:true,pinky:true,dir:null},
+    non:{thumb:true,index:true,middle:true,ring:true,pinky:true,dir:null},
+    rel:'close', bimanual:true },
+
+  { key:'VICTOIRE',   emoji:'🏆', fr:'VICTOIRE',    en:'Victory / Peace ×2',
+    desc:'Les deux mains en V — victoire double',
+    dom:{thumb:false,index:true,middle:true,ring:false,pinky:false,dir:null},
+    non:{thumb:false,index:true,middle:true,ring:false,pinky:false,dir:null},
+    rel:'any', bimanual:true },
+
+  { key:'MUSIQUE',    emoji:'🎵', fr:'MUSIQUE',     en:'Music',
+    desc:'Les deux mains "rock" — musique / concert',
+    dom:{thumb:false,index:true,middle:false,ring:false,pinky:true,dir:null},
+    non:{thumb:false,index:true,middle:false,ring:false,pinky:true,dir:null},
+    rel:'any', bimanual:true },
+
+  { key:'DOUBLE_AMOUR',emoji:'🤟',fr:'AMOUR FORT',  en:'Much Love',
+    desc:'Les deux mains ILY — aimer très fort (forme emphatique)',
+    dom:{thumb:true,index:true,middle:false,ring:false,pinky:true,dir:null},
+    non:{thumb:true,index:true,middle:false,ring:false,pinky:true,dir:null},
+    rel:'any', bimanual:true },
+
+  { key:'DONNER',     emoji:'🎁', fr:'DONNER',      en:'Give / Offer',
+    desc:'Main dominante ouverte, non-dominante fermée (Laveau: "signe d\'offrir")',
+    dom:{thumb:true,index:true,middle:true,ring:true,pinky:true,dir:null},
+    non:{thumb:false,index:false,middle:false,ring:false,pinky:false,dir:null},
+    rel:'close', bimanual:true },
+
+  { key:'ENSEIGNER',  emoji:'🎓', fr:'ENSEIGNER',   en:'Teach / Learn',
+    desc:'Index dominant pointé sur la main non-dominante ouverte (lire/enseigner)',
+    dom:{thumb:false,index:true,middle:false,ring:false,pinky:false,dir:null},
+    non:{thumb:true,index:true,middle:true,ring:true,pinky:true,dir:null},
+    rel:'close', bimanual:true },
+
+  { key:'PARFAIT',    emoji:'👌', fr:'PARFAIT',     en:'Perfect',
+    desc:'Les deux mains OK simultanément',
+    dom:{thumb:true,index:false,middle:true,ring:true,pinky:true,dir:null},
+    non:{thumb:true,index:false,middle:true,ring:true,pinky:true,dir:null},
+    rel:'any', bimanual:true },
+];
+
+function _bimatchFinger(f, p) {
+  if (p.thumb  !== null && p.thumb  !== f.thumb)  return false;
+  if (p.index  !== null && p.index  !== f.index)  return false;
+  if (p.middle !== null && p.middle !== f.middle)  return false;
+  if (p.ring   !== null && p.ring   !== f.ring)    return false;
+  if (p.pinky  !== null && p.pinky  !== f.pinky)   return false;
+  if (p.dir === 'up'   && !f.thumbUp)   return false;
+  if (p.dir === 'down' && !f.thumbDown) return false;
+  return true;
+}
+
+function _matchRelDist(dist, rel) {
+  if (!rel || rel === 'any') return true;
+  if (rel === 'close') return dist < 0.35;
+  if (rel === 'apart') return dist > 0.42;
+  return true;
+}
+
+function classifyBimanual(lm0, lm1) {
+  var f0 = getFingers(lm0), f1 = getFingers(lm1);
+  var w0 = lm0[0], w1 = lm1[0];
+  var dx = w0.x - w1.x, dy = w0.y - w1.y;
+  var dist = Math.sqrt(dx*dx + dy*dy);
+
+  // Dominant = lower x in raw frame (= user's right hand, appears right in mirrored view)
+  var domF = w0.x <= w1.x ? f0 : f1;
+  var nonF = w0.x <= w1.x ? f1 : f0;
+
+  for (var i = 0; i < BIMANUAL_SIGNS.length; i++) {
+    var s = BIMANUAL_SIGNS[i];
+    if (!_matchRelDist(dist, s.rel)) continue;
+    // Try direct ordering
+    if (_bimatchFinger(domF, s.dom) && _bimatchFinger(nonF, s.non)) {
+      return { sign: s, conf: 80, domF: domF, nonF: nonF, dist: dist };
+    }
+    // Try reversed ordering (for asymmetric signs, catches left-handed users)
+    if (_bimatchFinger(domF, s.non) && _bimatchFinger(nonF, s.dom)) {
+      return { sign: s, conf: 78, domF: domF, nonF: nonF, dist: dist };
+    }
+  }
+  return { sign: null, conf: 0 };
 }
 
 /* ── CAMERA & DETECTION LOOP ──────────────────────────── */
@@ -974,36 +1105,66 @@ async function startCam() {
   });
 
   mpH.setOptions({
-    maxNumHands: 1,
+    maxNumHands: 2,
     modelComplexity: 0,
     minDetectionConfidence: 0.55,
     minTrackingConfidence: 0.40
   });
-  appLog('info', 'Modèle: maxMains=1, complexité=0, détection≥55%, suivi≥40%');
+  appLog('info', 'Modèle: maxMains=2 (bimanuel activé), complexité=0, détection≥55%, suivi≥40%');
 
   mpH.onResults(function(res) {
     ctx.clearRect(0, 0, cvs.width, cvs.height);
-    if (res.multiHandLandmarks && res.multiHandLandmarks.length) {
-      var lm = res.multiHandLandmarks[0];
-      drawConnectors(ctx, lm, HAND_CONNECTIONS, { color: '#6366f1', lineWidth: 2 });
-      drawLandmarks(ctx, lm, { color: '#fff', fillColor: '#7c3aed', radius: 3 });
-      var r = classify(lm);
-      _onDetect(r.sign, r.conf, r.f);
-      if (debugOn) {
-        var f = r.f;
-        document.getElementById('dbgBox').innerHTML =
-          'T:' + +f.thumb + ' I:' + +f.index + ' M:' + +f.middle + ' R:' + +f.ring + ' P:' + +f.pinky + '<br>' +
-          'thumbUp:' + +f.thumbUp + ' dn:' + +f.thumbDown + '<br>' +
-          'palmW: ' + f.palmW.toFixed(3) + '<br>' +
-          '→ ' + (r.sign ? r.sign.fr : '—');
-      }
-    } else {
+    var lms = res.multiHandLandmarks;
+    var handCount = lms ? lms.length : 0;
+
+    if (!handCount) {
       _onDetect(null, 0, null);
       if (debugOn) document.getElementById('dbgBox').textContent = 'Aucune main';
+      return;
+    }
+
+    // Draw all hands with distinct colours
+    var COLOURS = [['#6366f1','#7c3aed'],['#22c55e','#059669']];
+    for (var hi = 0; hi < handCount; hi++) {
+      var c = COLOURS[hi] || COLOURS[0];
+      drawConnectors(ctx, lms[hi], HAND_CONNECTIONS, {color: c[0], lineWidth: 2});
+      drawLandmarks(ctx, lms[hi], {color:'#fff', fillColor: c[1], radius: 3});
+    }
+
+    // ── 2-hand bimanual classification ──
+    if (handCount >= 2) {
+      var bi = classifyBimanual(lms[0], lms[1]);
+      if (bi.sign) {
+        _onDetect(bi.sign, bi.conf, bi.domF);
+        if (debugOn) {
+          var df = bi.domF, nf = bi.nonF;
+          document.getElementById('dbgBox').innerHTML =
+            '👐 BIMANUEL dist=' + bi.dist.toFixed(2) + '<br>' +
+            'D T:'++(df.thumb)+' I:'++(df.index)+' M:'++(df.middle)+' R:'++(df.ring)+' P:'++(df.pinky)+'<br>' +
+            'G T:'++(nf.thumb)+' I:'++(nf.index)+' M:'++(nf.middle)+' R:'++(nf.ring)+' P:'++(nf.pinky)+'<br>' +
+            '→ '+bi.sign.fr;
+        }
+        return;
+      }
+    }
+
+    // ── Fallback: classify dominant hand (lower x = user's right) ──
+    var domLm = lms[0];
+    if (handCount >= 2 && lms[1][0].x < lms[0][0].x) domLm = lms[1];
+    var r = classify(domLm);
+    _onDetect(r.sign, r.conf, r.f);
+    if (debugOn) {
+      var f = r.f;
+      document.getElementById('dbgBox').innerHTML =
+        (handCount >= 2 ? '✋✋ 2 mains (unimanuel)<br>' : '') +
+        'T:'++(f.thumb)+' I:'++(f.index)+' M:'++(f.middle)+' R:'++(f.ring)+' P:'++(f.pinky)+'<br>' +
+        'thumbUp:'++(f.thumbUp)+' dn:'++(f.thumbDown)+'<br>' +
+        'palmW: '+f.palmW.toFixed(3)+'<br>' +
+        '→ '+(r.sign ? r.sign.fr : '—');
     }
   });
 
-  appLog('ok', '── Détection démarrée (20 fps) ──');
+  appLog('ok', '── Détection démarrée (20 fps) — ' + SIGNS.length + ' signes unimanuel + ' + BIMANUAL_SIGNS.length + ' signes bimanuel ──');
   running = true; _errCount = 0;
   var lastTs = 0;
   var FRAME_MS = 1000 / 20;
@@ -1070,10 +1231,11 @@ function _onDetect(sign, conf, fingers) {
     return;
   }
 
-  document.getElementById('liveSign').textContent  = sign.emoji + ' ' + sign.fr;
-  document.getElementById('liveConf').textContent  = 'Confiance : ' + conf + '%';
+  var biTag = sign.bimanual ? ' 👐' : '';
+  document.getElementById('liveSign').textContent  = sign.emoji + ' ' + sign.fr + biTag;
+  document.getElementById('liveConf').textContent  = 'Confiance : ' + conf + '%' + (sign.bimanual ? ' · 2 mains' : '');
   document.getElementById('heroEmoji').textContent = sign.emoji;
-  document.getElementById('heroSign').textContent  = sign.fr;
+  document.getElementById('heroSign').textContent  = sign.fr + (sign.bimanual ? ' 👐' : '');
   document.getElementById('heroEn').textContent    = sign.en;
   document.getElementById('confFill').style.width  = conf + '%';
 
@@ -1100,7 +1262,7 @@ function _onDetect(sign, conf, fingers) {
     holdKey = null; holdStart = 0;
     document.getElementById('holdRing').style.display = 'none';
     document.getElementById('heroEn').textContent = '✅ Ajouté !';
-    appLog('ok', 'Signe ajouté: ' + sign.fr + ' (' + sign.en + ') — phrase: ' + sentence.join(' › '));
+    appLog('ok', (sign.bimanual ? '👐 Bimanuel: ' : '✋ Signe: ') + sign.fr + ' (' + sign.en + ') — phrase: ' + sentence.join(' › '));
     speakFR(sign.fr);
   } else {
     var rem = ((HOLD_MS - elapsed) / 1000).toFixed(1);

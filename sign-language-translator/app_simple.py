@@ -59,14 +59,16 @@ def _download_mp():
                 print(f'[MP] download failed {fname} attempt {attempt+1}: {e}')
                 if attempt < 2:
                     time.sleep(2 ** attempt)
-    _mp_status['ready'] = True
-    print(f'[MP] ready — {_mp_status["done"]}/{_mp_status["total"]} files in {_MP_DIR}')
+    _mp_status['ready'] = (_mp_status['done'] == _mp_status['total'])
+    print(f'[MP] ready={_mp_status["ready"]} — {_mp_status["done"]}/{_mp_status["total"]} files in {_MP_DIR}')
 
 threading.Thread(target=_download_mp, daemon=True).start()
 
 @app.route('/mp/<path:filename>')
 def serve_mp(filename):
-    f = _MP_DIR / filename
+    f = (_MP_DIR / filename).resolve()
+    if not str(f).startswith(str(_MP_DIR.resolve())):
+        return 'forbidden', 403
     if not f.exists():
         return 'not ready', 503
     mime = ('application/wasm' if filename.endswith('.wasm')
@@ -629,14 +631,56 @@ function clearLogs() {
   document.getElementById('logCnt').textContent = '0';
 }
 
-// Global error capture
+// WASM patch state
+var _blobUrls = [], _wasmAborted = false, _onerrorCount = 0;
+
+async function _fetchAndPatchJs(url) {
+  var fname = url.split('/').pop();
+  appLog('info', 'Patch WASM: téléchargement ' + fname + '…');
+  var resp = await fetch(url, { mode: 'cors', cache: 'force-cache' });
+  if (!resp.ok) throw new Error('HTTP ' + resp.status + ' — ' + fname);
+  var text = await resp.text();
+  var patched = text.replace(
+    /Object\.getOwnPropertyDescriptor\(Module,\s*["']arguments['"]\)/g, 'false'
+  );
+  appLog(patched !== text ? 'ok' : 'warn',
+    'Patch ' + fname + ': ' + (patched !== text ? 'assertion WASM neutralisée ✓' : 'pattern absent (ok si déjà patché)'));
+  var blobUrl = URL.createObjectURL(new Blob([patched], {type: 'application/javascript'}));
+  _blobUrls.push(blobUrl);
+  return blobUrl;
+}
+
+function _revokeBlobUrls() {
+  _blobUrls.forEach(function(u) { URL.revokeObjectURL(u); });
+  _blobUrls = [];
+}
+
+// Global error capture — flood-limited, WASM abort detector
 window.onerror = function(msg, src, line) {
-  appLog('err', 'JS Exception: ' + msg + ' — ' + (src || '?') + ':' + line);
+  _onerrorCount++;
+  if (_onerrorCount <= 10) {
+    appLog('err', 'JS Exception: ' + msg + ' — ' + (src || '?') + ':' + line);
+  } else if (_onerrorCount === 11) {
+    appLog('err', 'Flood d\'erreurs détecté — logs JS supprimés (voir console navigateur)');
+  }
+  if (msg && msg.indexOf('Module.arguments') !== -1 && !_wasmAborted) {
+    _wasmAborted = true;
+    appLog('err', '⚠ WASM abandonné (Module.arguments) — arrêt automatique. Rechargez la page.');
+    setTimeout(function() { if (running) stopCam(); }, 100);
+  }
   return false;
 };
 window.addEventListener('unhandledrejection', function(e) {
   var reason = e.reason && e.reason.message ? e.reason.message : String(e.reason);
-  appLog('err', 'Promise rejetée: ' + reason);
+  _onerrorCount++;
+  if (_onerrorCount <= 10) {
+    appLog('err', 'Promise rejetée: ' + reason);
+  }
+  if (reason && reason.indexOf('Module.arguments') !== -1 && !_wasmAborted) {
+    _wasmAborted = true;
+    appLog('err', '⚠ WASM abandonné (Module.arguments) — arrêt automatique. Rechargez la page.');
+    setTimeout(function() { if (running) stopCam(); }, 100);
+  }
 });
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -895,12 +939,34 @@ async function startCam() {
   } catch(_) {}
   appLog('info', 'SIMD: ' + (simdOk ? 'supporté ✓' : 'non supporté — utilisation du fichier WASM non-SIMD'));
 
+  // Pré-fetch + patch client-side des fichiers WASM JS (neutralise l'assertion Module.arguments)
+  // Ce patch est indispensable aussi bien pour les fichiers locaux que CDN.
+  var wasmBase = _useLocal
+    ? '/mp/'
+    : 'https://unpkg.com/@mediapipe/hands@0.4.1646424915/';
+  var patchedUrls = {};
+  _wasmAborted = false; _onerrorCount = 0;
+  appLog('info', 'Application du patch WASM client-side (' + (simdOk ? 'SIMD + non-SIMD' : 'non-SIMD seulement') + ')…');
+  try {
+    if (simdOk) {
+      patchedUrls['hands_solution_simd_wasm_bin.js'] =
+        await _fetchAndPatchJs(wasmBase + 'hands_solution_simd_wasm_bin.js');
+    }
+    patchedUrls['hands_solution_wasm_bin.js'] =
+      await _fetchAndPatchJs(wasmBase + 'hands_solution_wasm_bin.js');
+    appLog('ok', 'Patch WASM client-side appliqué ✓');
+  } catch(e) {
+    appLog('warn', 'Patch client-side partiel: ' + e.message + ' — poursuite sans Blob URL pour ce fichier');
+  }
+
   mpH = new Hands({
     locateFile: function(f) {
-      // If SIMD not supported, redirect to non-SIMD equivalent
-      if (!simdOk && f.includes('simd_wasm_bin')) {
+      // SIMD absent → redirect vers équivalent non-SIMD
+      if (!simdOk && f.indexOf('simd_wasm_bin') !== -1) {
         f = f.replace('simd_wasm_bin', 'wasm_bin');
       }
+      // Retourner Blob URL patché si disponible
+      if (patchedUrls[f]) return patchedUrls[f];
       return _useLocal
         ? '/mp/' + f
         : 'https://unpkg.com/@mediapipe/hands@0.4.1646424915/' + f;
@@ -969,6 +1035,7 @@ function stopCam() {
   if (rafId)  { cancelAnimationFrame(rafId); rafId = null; }
   if (mpH)    { try { mpH.close(); } catch(_) {} mpH = null; }
   if (stream) { stream.getTracks().forEach(function(t) { t.stop(); }); stream = null; }
+  _revokeBlobUrls();
   document.getElementById('cvs').getContext('2d').clearRect(0, 0, 9999, 9999);
   appLog('info', 'Caméra et modèle arrêtés');
   _resetCamUI();
@@ -1205,7 +1272,7 @@ def index():
 
 @app.route('/api/translate', methods=['POST'])
 def translate():
-    data = request.json
+    data = request.get_json(silent=True) or {}
     text = data.get('text', '').strip()
     language = data.get('language', 'french')
     target = data.get('target', 'LSF')

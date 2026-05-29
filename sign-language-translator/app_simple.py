@@ -67,7 +67,8 @@ threading.Thread(target=_download_mp, daemon=True).start()
 @app.route('/mp/<path:filename>')
 def serve_mp(filename):
     f = (_MP_DIR / filename).resolve()
-    if not str(f).startswith(str(_MP_DIR.resolve())):
+    mp_root = _MP_DIR.resolve()
+    if not (f == mp_root or str(f).startswith(str(mp_root) + '/')):
         return 'forbidden', 403
     if not f.exists():
         return 'not ready', 503
@@ -100,7 +101,19 @@ SIGN_MAP = {
     'je':'IX-1','tu':'IX-2','il':'IX-3','elle':'IX-3','nous':'IX-1PL',
     'vais':'FUTURE','manger':'EAT','veux':'WANT','aller':'GO',
     'pomme':'APPLE','demain':'TOMORROW','bonjour':'HI','merci':'THANK',
-    'oui':'YES','non':'NO','bon':'GOOD','eau':'WATER',
+    'oui':'YES','non':'NO','bon':'BON','eau':'EAU',
+    # ── Laveau 1868 enrichissements ──────────────────────────────────────────
+    'aimer':'AIMER','amour':'AIMER','aime':'AIMER',
+    'aller':'ALLER','marcher':'ALLER',
+    'arbre':'ARBRE',
+    'boire':'BOIRE','boisson':'BOIRE',
+    'corps':'CORPS',
+    'désirer':'DESIRER','désir':'DESIRER','vouloir':'DESIRER',
+    'donner':'DONNER','offrir':'DONNER',
+    'fort':'FORT','force':'FORT','puissant':'FORT',
+    'monde':'MONDE','terre':'MONDE',
+    'promettre':'PROMETTRE','promesse':'PROMETTRE',
+    'vrai':'VRAI','vérité':'VRAI','vraiment':'VRAI',
 }
 SKIP = {
     'a','an','the','is','are','was','were','be','been','to','of','in','on',
@@ -110,18 +123,32 @@ SKIP = {
 }
 TIME_GLOSSES = {'FUTURE','TOMORROW','TODAY','PAST','NOW'}
 SIGN_DESC = {
-    'IX-1':{'handshape':'Index pointé','location':'Poitrine','movement':'Pointer vers soi'},
-    'IX-2':{'handshape':'Index pointé','location':'Vers interlocuteur','movement':'Pointer vers la personne'},
-    'FUTURE':{'handshape':'Main ouverte paume gauche','location':'Côté visage','movement':'Avancer la main'},
-    'TOMORROW':{'handshape':'Main-A','location':'Joue','movement':'Arc vers l\'avant'},
-    'HI':{'handshape':'Main-B ouverte','location':'Front','movement':'Agiter vers l\'extérieur'},
-    'THANK':{'handshape':'Main plate','location':'Menton','movement':'Avancer vers la personne'},
-    'YES':{'handshape':'Poing (S)','location':'Devant soi','movement':'Hocher le poing'},
-    'NO':{'handshape':'Index+Majeur tendus','location':'Devant soi','movement':'Fermer les doigts'},
-    'WANT':{'handshape':'Mains courbées paumes haut','location':'Devant soi','movement':'Tirer vers soi'},
-    'LOVE':{'handshape':'Bras croisés poings','location':'Poitrine','movement':'Croiser les bras'},
-    'GOOD':{'handshape':'Main ouverte paume haut','location':'Menton','movement':'Avancer dans l\'autre paume'},
-    'EAT':{'handshape':'Main-O plate','location':'Bouche','movement':'Toucher les doigts à la bouche'},
+    'IX-1':      {'handshape':'Index pointé','location':'Poitrine','movement':'Pointer vers soi'},
+    'IX-2':      {'handshape':'Index pointé','location':'Vers interlocuteur','movement':'Pointer vers la personne'},
+    'FUTURE':    {'handshape':'Main ouverte paume gauche','location':'Côté visage','movement':'Avancer la main'},
+    'TOMORROW':  {'handshape':'Main-A','location':'Joue','movement':'Arc vers l\'avant'},
+    'HI':        {'handshape':'Main-B ouverte','location':'Front','movement':'Agiter vers l\'extérieur'},
+    'THANK':     {'handshape':'Main plate','location':'Menton','movement':'Avancer vers la personne'},
+    'YES':       {'handshape':'Poing (S)','location':'Devant soi','movement':'Hocher le poing'},
+    'NO':        {'handshape':'Index+Majeur tendus','location':'Devant soi','movement':'Fermer les doigts'},
+    'WANT':      {'handshape':'Mains courbées paumes haut','location':'Devant soi','movement':'Tirer vers soi'},
+    'LOVE':      {'handshape':'Bras croisés poings','location':'Poitrine','movement':'Croiser les bras'},
+    'GOOD':      {'handshape':'Main ouverte paume haut','location':'Menton','movement':'Avancer dans l\'autre paume'},
+    'EAT':       {'handshape':'Main-O plate','location':'Bouche','movement':'Toucher les doigts à la bouche'},
+    # ── Laveau 1868 ──────────────────────────────────────────────────────────
+    'AIMER':     {'handshape':'Deux mains plates','location':'Poitrine/cœur','movement':'Appuyer les deux mains sur le cœur (Laveau)'},
+    'ALLER':     {'handshape':'Index étendus','location':'Devant soi','movement':'Avancer les deux mains, index tournant l\'un autour de l\'autre (Laveau)'},
+    'ARBRE':     {'handshape':'Main droite ouverte élevée + main gauche en support','location':'Épaule droite','movement':'Élever le bras droit, main gauche sous le coude (Laveau)'},
+    'BOIRE':     {'handshape':'Main droite demi-ouverte','location':'Bouche','movement':'Simuler l\'action de boire (Laveau)'},
+    'BON':       {'handshape':'Deux mains ouvertes','location':'Des deux côtés','movement':'Abaisser les deux mains de chaque côté avec expression de bonté (Laveau)'},
+    'CORPS':     {'handshape':'Deux mains ouvertes','location':'Haut du corps','movement':'Descendre les deux mains ouvertes jusqu\'à la poitrine (Laveau)'},
+    'DESIRER':   {'handshape':'Doigts recourbés','location':'Poitrine','movement':'Ramener les deux mains vers soi depuis le cœur (Laveau)'},
+    'DONNER':    {'handshape':'Main droite inclinée','location':'Devant soi','movement':'Incliner la main vers l\'avant, dessus en bas (Laveau)'},
+    'EAU':       {'handshape':'Doigts séparés et étendus','location':'Devant soi','movement':'Agiter doucement les doigts séparés (Laveau)'},
+    'FORT':      {'handshape':'Deux poings fermés','location':'Épaules','movement':'Fermer les deux poings à la naissance des épaules (Laveau)'},
+    'MONDE':     {'handshape':'Deux bras ouverts','location':'Devant soi','movement':'Former un grand cercle avec les deux bras (Laveau)'},
+    'PROMETTRE': {'handshape':'Deux index levés','location':'Devant soi','movement':'Lever les deux index côte à côte (Laveau)'},
+    'VRAI':      {'handshape':'Main ouverte doigts serrés','location':'Hauteur du front','movement':'Abaisser fortement la main, paume vers le bas, vers la poitrine (Laveau)'},
 }
 
 def translate_with_slt(text, language, target_sign):
@@ -809,6 +836,11 @@ var SIGNS = [
   { key:'APPELER',  emoji:'🤙', fr:'APPELER',      en:'Call Me',     desc:'Pouce + Auriculaire levés (Shaka)',       p:{thumb:true, index:false, middle:false, ring:false, pinky:true,  dir:null} },
   { key:'ROCK',     emoji:'🤘', fr:'ROCK',         en:'Rock On',     desc:'Index + Auriculaire levés, pouce bas',    p:{thumb:false,index:true,  middle:false, ring:false, pinky:true,  dir:null} },
   { key:'OK',       emoji:'👌', fr:'OK',           en:'OK',          desc:'Majeur + Annulaire + Auriculaire levés',  p:{thumb:true, index:false, middle:true,  ring:true,  pinky:true,  dir:null} },
+  // ── Laveau 1868 ───────────────────────────────────────────────────────────
+  { key:'DEUX',     emoji:'✌', fr:'DEUX',          en:'Two',         desc:'Pouce + Index levés (Laveau: "ouvrez le pouce et l\'index droit")',
+    p:{thumb:true, index:true,  middle:false, ring:false, pinky:false, dir:null} },
+  { key:'BOIRE_S',  emoji:'🥤', fr:'BOIRE',        en:'Drink',       desc:'Pouce + Index + Majeur levés, annulaire et auriculaire repliés (main demi-ouverte, Laveau)',
+    p:{thumb:true, index:true,  middle:true,  ring:false, pinky:false, dir:null} },
 ];
 
 function buildRefGrid() {
@@ -873,7 +905,7 @@ function classify(lm) {
 /* ── BIMANUAL SIGN DICTIONARY (2 mains simultanées) ─────── */
 // Tiré du Petit Dictionnaire de Laveau (1868) + LSF contemporaine
 // dom = main dominante (droite utilisateur), non = main non-dominante
-// rel: 'close' = poignets proches (<0.35), 'apart' = poignets éloignés (>0.45), 'any' = sans contrainte
+// rel: 'close' = poignets proches (<0.35), 'apart' = poignets éloignés (>0.42), 'any' = sans contrainte
 var BIMANUAL_SIGNS = [
   // ── Du dictionnaire Laveau (1868) ──────────────────────────────────────────
   { key:'FORT',       emoji:'💪', fr:'FORT',        en:'Strong / Powerful',
@@ -963,6 +995,7 @@ function _matchRelDist(dist, rel) {
 }
 
 function classifyBimanual(lm0, lm1) {
+  if (!lm0 || lm0.length < 21 || !lm1 || lm1.length < 21) return { sign: null, conf: 0 };
   var f0 = getFingers(lm0), f1 = getFingers(lm1);
   var w0 = lm0[0], w1 = lm1[0];
   var dx = w0.x - w1.x, dy = w0.y - w1.y;
@@ -995,6 +1028,7 @@ var _errCount = 0;
 var HOLD_MS = 1000;
 // hold ring circumference: 2π × r18 ≈ 113
 var HOLD_CIRC = 113;
+var HAND_COLOURS = [['#6366f1','#7c3aed'],['#22c55e','#059669']];
 
 function toggleDebug() {
   debugOn = !debugOn;
@@ -1003,7 +1037,9 @@ function toggleDebug() {
 }
 
 async function startCam() {
+  if (running) return;
   // Unlock TTS in user gesture — required on iOS/Safari
+  _wasmAborted = false; _onerrorCount = 0;
   try {
     var u = new SpeechSynthesisUtterance(' '); u.volume = 0;
     speechSynthesis.speak(u);
@@ -1076,7 +1112,6 @@ async function startCam() {
     ? '/mp/'
     : 'https://unpkg.com/@mediapipe/hands@0.4.1646424915/';
   var patchedUrls = {};
-  _wasmAborted = false; _onerrorCount = 0;
   appLog('info', 'Application du patch WASM client-side (' + (simdOk ? 'SIMD + non-SIMD' : 'non-SIMD seulement') + ')…');
   try {
     if (simdOk) {
@@ -1124,9 +1159,8 @@ async function startCam() {
     }
 
     // Draw all hands with distinct colours
-    var COLOURS = [['#6366f1','#7c3aed'],['#22c55e','#059669']];
     for (var hi = 0; hi < handCount; hi++) {
-      var c = COLOURS[hi] || COLOURS[0];
+      var c = HAND_COLOURS[hi] || HAND_COLOURS[0];
       drawConnectors(ctx, lms[hi], HAND_CONNECTIONS, {color: c[0], lineWidth: 2});
       drawLandmarks(ctx, lms[hi], {color:'#fff', fillColor: c[1], radius: 3});
     }

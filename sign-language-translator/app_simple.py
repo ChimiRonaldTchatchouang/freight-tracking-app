@@ -25,12 +25,12 @@ _MP_FILES = [
 _mp_status = {'ready': False, 'done': 0, 'total': len(_MP_FILES)}
 
 _ASSERT_PAT = re.compile(
-    r'Object\.getOwnPropertyDescriptor\(Module,\s*["\']arguments["\']\)'
+    r'Object\.getOwnPropertyDescriptor\(Module,\s*["\'\`]arguments["\'\`]\)'
 )
 _ABORT_ARGS_PAT = re.compile(
-    r'\b\w+\s*\(\s*["\']Module\.arguments has been replaced[^"\']*["\']\s*\)'
+    r'\b\w+\s*\(\s*["\'\`]Module\.arguments has been replaced[^"\'\`]*["\'\`]\s*\)'
 )
-_PATCH_VER = '3'  # bump whenever patching logic changes to force cache invalidation
+_PATCH_VER = '4'  # bump whenever patching logic changes to force cache invalidation
 
 def _patch_mp(fname, raw):
     """Neutralise two Emscripten checks that conflict with hands.js Module.arguments."""
@@ -703,16 +703,17 @@ async function _fetchAndPatchJs(url) {
   var text = await resp.text();
   // Patch 1: assert(!Object.getOwnPropertyDescriptor(Module,"arguments"),...)
   var p1 = text.replace(
-    /Object\.getOwnPropertyDescriptor\(Module,\s*["']arguments['"]\)/g, 'false'
+    /Object\.getOwnPropertyDescriptor\(Module,\s*["'`]arguments["'`]\)/g, 'false'
   );
   // Patch 2: defineProperty getter abort("Module.arguments has been replaced...")
-  // Matches even if 'abort' was renamed by the minifier
+  // Handles double-quotes, single-quotes, and backtick template literals; also
+  // matches when 'abort' was renamed to a single letter by the minifier.
   var p2 = p1.replace(
-    /\b\w+\s*\(\s*["']Module\.arguments has been replaced[^"']*['"]\s*\)/g, '(0)'
+    /\b\w+\s*\(\s*["'`]Module\.arguments has been replaced[^"'`]*["'`]\s*\)/g, '(0)'
   );
   var nPatches = (p1 !== text ? 1 : 0) + (p2 !== p1 ? 1 : 0);
   appLog(nPatches > 0 ? 'ok' : 'warn',
-    'Patch ' + fname + ': ' + (nPatches > 0 ? nPatches + ' assertion(s) WASM neutralisée(s) ✓' : 'patterns absents (déjà patchés côté serveur ✓)'));
+    'Patch ' + fname + ': ' + (nPatches > 0 ? nPatches + ' assertion(s) WASM neutralisée(s) ✓' : 'patterns absents (fichiers CDN non patchables — risque de crash WASM)'));
   var blobUrl = URL.createObjectURL(new Blob([p2], {type: 'application/javascript'}));
   _blobUrls.push(blobUrl);
   return blobUrl;
@@ -1147,6 +1148,12 @@ function _addPredSign(key) {
 }
 
 /* ── CAMERA & DETECTION LOOP ──────────────────────────── */
+// Pre-define window.Module now, before hands.js ever loads.
+// packed_assets_loader.js line 54 references Module as a bare global — if Module
+// is undefined (e.g. after delete window.Module in a previous stop), it throws
+// ReferenceError. Initialising here ensures the global always exists.
+window.Module = window.Module || {};
+
 var mpH = null, rafId = null, stream = null, running = false;
 var holdKey = null, holdStart = 0, cooldownUntil = 0;
 var sentence = [], _sentenceObjs = [], debugOn = false;
@@ -1365,8 +1372,10 @@ function stopCam() {
   if (mpH)    { try { mpH.close(); } catch(_) {} mpH = null; }
   if (stream) { stream.getTracks().forEach(function(t) { t.stop(); }); stream = null; }
   _revokeBlobUrls();
-  // Reset global Module so next startCam() gets a fresh instance
-  try { delete window.Module; } catch(_) { window.Module = undefined; }
+  // Reset Module state for next startCam(), but NEVER delete window.Module —
+  // packed_assets_loader.js (already loaded as a <script>) uses it as a bare
+  // global; deleting it causes ReferenceError on every subsequent start.
+  window.Module = {};
   document.getElementById('cvs').getContext('2d').clearRect(0, 0, 9999, 9999);
   appLog('info', 'Caméra et modèle arrêtés');
   _resetCamUI();

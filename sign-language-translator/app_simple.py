@@ -394,6 +394,49 @@ main{padding-top:calc(var(--hh) + 1.25rem);padding-bottom:1.25rem;
   background:var(--green);color:#fff;font-size:6px;font-weight:800;
   padding:0 3px;border-radius:3px;line-height:1.6;letter-spacing:.02em
 }
+/* ── LEARN SERVICE ── */
+.btn-learn{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;margin-top:.45rem}
+.btn-learn:hover{filter:brightness(1.08)}
+.learn-body{padding:.75rem 1rem;display:flex;flex-direction:column;gap:.65rem}
+.fp-display-wrap{background:#f8fafc;border-radius:8px;padding:.55rem .75rem;border:1px solid var(--border)}
+.fp-label-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem}
+.fp-label{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.btn-recap{background:none;border:1.5px solid var(--border);border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;font-weight:700;color:var(--muted)}
+.btn-recap:hover{background:#f1f5f9;color:var(--text)}
+.fp-display{display:flex;gap:.4rem;flex-wrap:wrap;align-items:center}
+.fp-finger{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:38px}
+.fp-finger .fp-icon{font-size:20px;line-height:1}
+.fp-finger .fp-name{font-size:8px;font-weight:800;color:var(--muted);letter-spacing:.04em}
+.fp-finger.up .fp-icon{color:#059669}
+.fp-finger.down .fp-icon{color:#cbd5e1}
+.fp-tag{font-size:10px;background:#e0e7ff;color:var(--brand);border-radius:5px;padding:1px 7px;font-weight:700}
+.learn-fields{display:flex;flex-direction:column;gap:.45rem}
+.learn-label{font-size:10px;font-weight:700;color:var(--muted);display:block;margin-bottom:1px}
+.learn-input{
+  width:100%;padding:.45rem .65rem;border:1.5px solid var(--border);border-radius:7px;
+  font:inherit;font-size:13px;outline:none;transition:border-color .15s
+}
+.learn-input:focus{border-color:var(--brand)}
+.learn-row{display:flex;gap:.5rem}
+.learn-actions{display:flex;gap:.5rem}
+.ref-item.custom{background:#fff7ed;border-color:#fed7aa}
+.ref-item.custom:hover{background:#fff0da}
+.custom-badge{
+  position:absolute;top:2px;left:2px;
+  background:var(--amber);color:#fff;font-size:6px;font-weight:800;
+  padding:0 3px;border-radius:3px;line-height:1.6
+}
+.ref-del{
+  position:absolute;top:2px;right:2px;
+  background:#fecaca;color:#dc2626;border:none;border-radius:3px;
+  font-size:8px;padding:0 3px;cursor:pointer;line-height:1.6;font-weight:800
+}
+.ref-del:hover{background:#dc2626;color:#fff}
+.learned-hdr{
+  padding:.4rem .75rem;font-size:10px;font-weight:800;
+  text-transform:uppercase;letter-spacing:.07em;
+  color:#92400e;border-top:1px solid #fed7aa;background:#fff7ed
+}
 
 /* ── TEXT PANE ── */
 .text-card{padding:1.25rem}
@@ -563,6 +606,39 @@ textarea{resize:vertical;min-height:100px;grid-column:1/-1}
         </div>
         <div class="cam-extra">
           <button class="btn btn-speak btn-block" onclick="speakSentence()">🔊 Lire la phrase à voix haute</button>
+          <button class="btn btn-learn btn-block" id="btnLearn" onclick="captureSign()" style="display:none">📚 Apprendre ce signe</button>
+        </div>
+      </div>
+
+      <!-- Learn panel — shown when capturing a new sign -->
+      <div class="card" id="learnPanel" style="display:none">
+        <div class="card-hdr">📚 Apprendre un nouveau signe</div>
+        <div class="learn-body">
+          <div class="fp-display-wrap">
+            <div class="fp-label-row">
+              <span class="fp-label">Position des doigts capturée :</span>
+              <button class="btn-recap" onclick="refreshCapture()">📸 Re-capturer</button>
+            </div>
+            <div class="fp-display" id="fpDisplay"></div>
+          </div>
+          <div class="learn-fields">
+            <label class="learn-label">Nom français *</label>
+            <input id="learnFr" type="text" placeholder="ex : Bonjour, Merci, Manger…" class="learn-input" autocomplete="off">
+            <div class="learn-row">
+              <div style="flex:0 0 76px">
+                <label class="learn-label">Emoji</label>
+                <input id="learnEmoji" type="text" placeholder="✋" class="learn-input" maxlength="4" style="text-align:center;font-size:16px">
+              </div>
+              <div style="flex:1">
+                <label class="learn-label">Anglais (optionnel)</label>
+                <input id="learnEn" type="text" placeholder="ex : Hello" class="learn-input">
+              </div>
+            </div>
+          </div>
+          <div class="learn-actions">
+            <button class="btn btn-primary" onclick="saveLearnedSign()" style="flex:1">💾 Sauvegarder</button>
+            <button class="btn btn-ghost" onclick="cancelLearn()" title="Annuler">✕</button>
+          </div>
         </div>
       </div>
 
@@ -580,6 +656,10 @@ textarea{resize:vertical;min-height:100px;grid-column:1/-1}
       <div class="card">
         <div class="card-hdr">Signes disponibles (LSF)</div>
         <div class="ref-grid" id="refGrid"></div>
+        <div id="learnedSignsSec" style="display:none">
+          <div class="learned-hdr">✎ Mes signes appris</div>
+          <div class="ref-grid" id="learnedRefGrid"></div>
+        </div>
       </div>
 
     </div>
@@ -773,9 +853,105 @@ document.addEventListener('DOMContentLoaded', function() {
   var ios = /iP(hone|ad|od)/.test(ua);
   var android = /Android/.test(ua);
   appLog('info', 'Plateforme: ' + (ios ? 'iOS' : android ? 'Android' : 'Desktop') + ' | RAM: ' + (navigator.deviceMemory || '?') + ' GB');
+  _loadLearnedSigns();
   buildRefGrid();
   _bgPreload(); // Start loading MediaPipe immediately in the background
 });
+
+/* ── LEARNING SERVICE ────────────────────────────────── */
+function _loadLearnedSigns() {
+  try {
+    var raw = localStorage.getItem('lsf_learned_signs');
+    if (raw) { LEARNED_SIGNS = JSON.parse(raw); }
+  } catch(e) { LEARNED_SIGNS = []; }
+}
+
+function _saveLearnedSigns() {
+  try { localStorage.setItem('lsf_learned_signs', JSON.stringify(LEARNED_SIGNS)); } catch(e) {}
+}
+
+function _updateFingerDisplay(f) {
+  var dp = document.getElementById('fpDisplay');
+  if (!dp || !f) return;
+  var fingers = [
+    { name:'Pouce', abbr:'P',  val: f.thumb  },
+    { name:'Index', abbr:'I',  val: f.index  },
+    { name:'Maj.',  abbr:'M',  val: f.middle },
+    { name:'Ann.',  abbr:'A',  val: f.ring   },
+    { name:'Aur.',  abbr:'Au', val: f.pinky  },
+  ];
+  var html = '';
+  fingers.forEach(function(fi) {
+    html += '<div class="fp-finger ' + (fi.val ? 'up' : 'down') + '" title="' + fi.name + '">'
+          + '<span class="fp-icon">' + (fi.val ? '☝️' : '✊') + '</span>'
+          + '<span class="fp-name">' + fi.abbr + '</span></div>';
+  });
+  if (f.thumbUp)   html += '<span class="fp-tag">👍 haut</span>';
+  if (f.thumbDown) html += '<span class="fp-tag">👎 bas</span>';
+  dp.innerHTML = html;
+}
+
+function captureSign() {
+  if (!running) { appLog('warn', 'Démarrez la caméra avant d\'apprendre un signe'); return; }
+  if (!_lastFingers) { appLog('warn', '⚠ Aucune main détectée — montrez votre signe à la caméra'); return; }
+  _capturedFingers = Object.assign({}, _lastFingers);
+  document.getElementById('learnPanel').style.display = 'block';
+  _updateFingerDisplay(_capturedFingers);
+  if (_lastSign && _lastSign.emoji) document.getElementById('learnEmoji').value = _lastSign.emoji;
+  document.getElementById('learnFr').value = '';
+  document.getElementById('learnEn').value = '';
+  document.getElementById('learnFr').focus();
+  appLog('info', '📸 Geste capturé — entrez son nom puis sauvegardez');
+}
+
+function refreshCapture() {
+  if (!_lastFingers) { appLog('warn', 'Aucune main détectée'); return; }
+  _capturedFingers = Object.assign({}, _lastFingers);
+  _updateFingerDisplay(_capturedFingers);
+  appLog('info', '📸 Geste re-capturé');
+}
+
+function saveLearnedSign() {
+  var fr = document.getElementById('learnFr').value.trim();
+  if (!fr) { document.getElementById('learnFr').focus(); return; }
+  var emoji = document.getElementById('learnEmoji').value.trim() || '✋';
+  var en    = document.getElementById('learnEn').value.trim()    || fr;
+  var key   = fr.toUpperCase().replace(/[\s\-]/g,'_').replace(/[^A-Z0-9_ÀÂÇÉÈÊËÎÏÔÙÛÜŸ]/gi,'').substring(0,24);
+  if (!key) key = 'SIGNE_' + Date.now();
+  var f = _capturedFingers;
+  var sign = {
+    key: key, emoji: emoji, fr: fr, en: en,
+    desc: 'Signe appris : ' + fr,
+    p: {
+      thumb:  f.thumb,  index:  f.index,  middle: f.middle,
+      ring:   f.ring,   pinky:  f.pinky,
+      dir:    f.thumbUp ? 'up' : (f.thumbDown ? 'down' : null)
+    },
+    learned: true, timestamp: Date.now()
+  };
+  var idx = LEARNED_SIGNS.findIndex(function(s) { return s.key === key; });
+  if (idx >= 0) { LEARNED_SIGNS[idx] = sign; appLog('ok', '✏️ Signe «' + fr + '» mis à jour'); }
+  else          { LEARNED_SIGNS.push(sign);  appLog('ok', '✅ Signe «' + fr + '» appris — total: ' + LEARNED_SIGNS.length); }
+  _saveLearnedSigns();
+  cancelLearn();
+  buildRefGrid();
+}
+
+function cancelLearn() {
+  _capturedFingers = null;
+  var p = document.getElementById('learnPanel');
+  if (p) p.style.display = 'none';
+}
+
+function deleteLearnedSign(key) {
+  var s = LEARNED_SIGNS.find(function(x) { return x.key === key; });
+  LEARNED_SIGNS = LEARNED_SIGNS.filter(function(x) { return x.key !== key; });
+  _saveLearnedSigns();
+  buildRefGrid();
+  if (s) appLog('info', 'Signe «' + s.fr + '» supprimé');
+}
+
+var _capturedFingers = null;
 
 /* ── MEDIAPIPE LOADER ─────────────────────────────────── */
 var _mpLoaded = false, _useLocal = false;
@@ -898,6 +1074,23 @@ function buildRefGrid() {
     d.innerHTML = '<span class="bi-badge">2M</span><span class="ref-emoji">' + s.emoji + '</span><span class="ref-label">' + s.fr + '</span>';
     g.appendChild(d);
   });
+  // Learned signs section
+  var sec = document.getElementById('learnedSignsSec');
+  var lg  = document.getElementById('learnedRefGrid');
+  if (sec && lg) {
+    sec.style.display = LEARNED_SIGNS.length ? 'block' : 'none';
+    lg.innerHTML = '';
+    LEARNED_SIGNS.forEach(function(s) {
+      var d = document.createElement('div');
+      d.className = 'ref-item custom';
+      d.title = s.desc;
+      d.innerHTML = '<span class="custom-badge">✎</span>'
+        + '<button class="ref-del" onclick="deleteLearnedSign(\'' + s.key.replace(/'/g, "\\'") + '\')" title="Supprimer">✕</button>'
+        + '<span class="ref-emoji">' + s.emoji + '</span>'
+        + '<span class="ref-label">' + s.fr + '</span>';
+      lg.appendChild(d);
+    });
+  }
 }
 
 /* ── HAND CLASSIFICATION ──────────────────────────────── */
@@ -936,6 +1129,18 @@ function classify(lm) {
     if (p.dir === 'up'   && !f.thumbUp)   continue;
     if (p.dir === 'down' && !f.thumbDown) continue;
     return { sign: s, conf: 82, f: f };
+  }
+  // Check custom learned signs (lower confidence; built-ins take priority)
+  for (var j = 0; j < LEARNED_SIGNS.length; j++) {
+    var ls = LEARNED_SIGNS[j], lp = ls.p;
+    if (lp.thumb  !== null && lp.thumb  !== f.thumb)  continue;
+    if (lp.index  !== null && lp.index  !== f.index)  continue;
+    if (lp.middle !== null && lp.middle !== f.middle)  continue;
+    if (lp.ring   !== null && lp.ring   !== f.ring)    continue;
+    if (lp.pinky  !== null && lp.pinky  !== f.pinky)   continue;
+    if (lp.dir === 'up'   && !f.thumbUp)   continue;
+    if (lp.dir === 'down' && !f.thumbDown) continue;
+    return { sign: ls, conf: 75, f: f };
   }
   return { sign: null, conf: 0, f: f };
 }
@@ -1076,7 +1281,7 @@ var COMMON_PHRASES = [
   {keys:['IX-1','HAPPY'],                fr:'Je suis heureux.',             en:"I'm happy."},
 ];
 
-function _allSigns() { return SIGNS.concat(BIMANUAL_SIGNS); }
+function _allSigns() { return SIGNS.concat(BIMANUAL_SIGNS).concat(LEARNED_SIGNS); }
 
 function getPredictions(currentKeys) {
   var n = currentKeys.length;
@@ -1166,6 +1371,9 @@ var HOLD_MS = 1000;
 // hold ring circumference: 2π × r18 ≈ 113
 var HOLD_CIRC = 113;
 var HAND_COLOURS = [['#6366f1','#7c3aed'],['#22c55e','#059669']];
+// Learning service
+var _lastFingers = null, _lastSign = null;
+var LEARNED_SIGNS = [];
 
 function toggleDebug() {
   debugOn = !debugOn;
@@ -1185,6 +1393,7 @@ async function startCam() {
 
   document.getElementById('btnStart').style.display = 'none';
   document.getElementById('btnStop').style.display  = 'inline-flex';
+  document.getElementById('btnLearn').style.display = 'block';
   document.getElementById('idleOverlay').style.display = 'none';
   document.getElementById('vidOverlay').style.display  = 'flex';
   document.getElementById('liveConf').textContent = 'Accès caméra…';
@@ -1387,6 +1596,7 @@ function stopCam() {
 function _resetCamUI() {
   document.getElementById('btnStart').style.display  = 'inline-flex';
   document.getElementById('btnStop').style.display   = 'none';
+  document.getElementById('btnLearn').style.display  = 'none';
   document.getElementById('idleOverlay').style.display = 'flex';
   document.getElementById('vidOverlay').style.display  = 'none';
   document.getElementById('holdRing').style.display    = 'none';
@@ -1396,10 +1606,13 @@ function _resetCamUI() {
   document.getElementById('heroEn').textContent    = 'Activez la caméra';
   document.getElementById('confFill').style.width  = '0%';
   holdKey = null; holdStart = 0;
+  cancelLearn();
 }
 
 /* ── DETECTION HANDLER ────────────────────────────────── */
 function _onDetect(sign, conf, fingers) {
+  if (fingers) { _lastFingers = fingers; }  // persist for learning capture
+  if (sign)    { _lastSign    = sign;    }
   var now = Date.now();
   if (!sign) {
     document.getElementById('liveSign').textContent  = '—';

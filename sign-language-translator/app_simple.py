@@ -329,6 +329,13 @@ main{padding-top:calc(var(--hh) + 1.25rem);padding-bottom:1.25rem;
   color:#7c3aed;opacity:.55;padding:0;line-height:1;transition:opacity .15s
 }
 .word-chip button:hover{opacity:1}
+#predBar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:28px;margin-top:8px;padding:0 2px}
+#phraseSuggest{font-size:.8rem;color:#8b5cf6;font-style:italic;margin-top:3px;min-height:16px;padding:0 2px}
+.pred-label{font-size:.72rem;color:#9ca3af;white-space:nowrap;margin-right:2px}
+.pred-btn{background:#ede9fe;color:#5b21b6;border:1px solid #c4b5fd;border-radius:999px;
+  padding:4px 12px;font-size:.78rem;cursor:pointer;transition:background .15s;white-space:nowrap}
+.pred-btn:hover{background:#ddd6fe}
+.pred-complete{color:#059669;font-weight:700;font-size:.82rem}
 
 /* Buttons */
 .btn{
@@ -542,6 +549,8 @@ textarea{resize:vertical;min-height:100px;grid-column:1/-1}
         <div class="sent-wrap" id="sentWrap">
           <span class="sent-empty" id="sentEmpty">Les signes reconnus apparaîtront ici…</span>
         </div>
+        <div id="phraseSuggest"></div>
+        <div id="predBar"></div>
       </div>
 
       <!-- Signs reference -->
@@ -1036,11 +1045,104 @@ function classifyBimanual(lm0, lm1) {
   return { sign: null, conf: 0 };
 }
 
+/* ── PHRASES COMMUNES + PRÉDICTION ───────────────────── */
+var COMMON_PHRASES = [
+  {keys:['HI'],                          fr:'Bonjour !',                   en:'Hello!'},
+  {keys:['HI','GOOD'],                   fr:'Bonjour, ça va bien ?',       en:'Hello, doing well?'},
+  {keys:['IX-1','GOOD'],                 fr:'Je vais bien.',                en:"I'm doing well."},
+  {keys:['IX-1','LIKE','IX-2'],          fr:"Je t'aime.",                   en:'I love you.'},
+  {keys:['THANK','IX-2'],                fr:'Merci à toi.',                 en:'Thank you.'},
+  {keys:['IX-1','SORRY'],                fr:'Je suis désolé.',              en:"I'm sorry."},
+  {keys:['IX-2','WANT','HELP'],          fr:"Tu as besoin d'aide ?",        en:'Do you need help?'},
+  {keys:['PLEASE','HELP'],               fr:"Aide-moi s'il te plaît.",      en:'Help me please.'},
+  {keys:['IX-1','WANT','EAT'],           fr:'Je veux manger.',              en:'I want to eat.'},
+  {keys:['IX-1','WANT','DRINK'],         fr:'Je veux boire.',               en:'I want to drink.'},
+  {keys:['IX-1','GO','HOME'],            fr:'Je rentre à la maison.',       en:"I'm going home."},
+  {keys:['YES','IX-1','KNOW'],           fr:'Oui, je sais.',                en:'Yes, I know.'},
+  {keys:['NO','SORRY'],                  fr:'Non, désolé.',                 en:'No, sorry.'},
+  {keys:['IX-1','HAPPY'],                fr:'Je suis heureux.',             en:"I'm happy."},
+];
+
+function _allSigns() { return SIGNS.concat(BIMANUAL_SIGNS); }
+
+function getPredictions(currentKeys) {
+  var n = currentKeys.length;
+  var seen = {}, results = [];
+  COMMON_PHRASES.forEach(function(p) {
+    if (p.keys.length <= n) return;
+    for (var i = 0; i < n; i++) {
+      if (p.keys[i] !== currentKeys[i]) return;
+    }
+    var nk = p.keys[n];
+    if (seen[nk]) return;
+    seen[nk] = true;
+    var obj = _allSigns().find(function(s) { return s.key === nk; });
+    if (obj) results.push({nextKey: nk, signObj: obj, hint: p.fr});
+  });
+  return results;
+}
+
+function _exactPhraseMatch(currentKeys) {
+  return COMMON_PHRASES.find(function(p) {
+    return p.keys.length === currentKeys.length &&
+           p.keys.every(function(k, i) { return k === currentKeys[i]; });
+  }) || null;
+}
+
+function _bestPhraseHint(currentKeys) {
+  var n = currentKeys.length, best = null;
+  COMMON_PHRASES.forEach(function(p) {
+    if (p.keys.length <= n) return;
+    for (var i = 0; i < n; i++) {
+      if (p.keys[i] !== currentKeys[i]) return;
+    }
+    if (!best || p.keys.length < best.keys.length) best = p;
+  });
+  return best;
+}
+
+function _updatePredictions() {
+  var currentKeys = _sentenceObjs.map(function(s) { return s.key; });
+  var bar = document.getElementById('predBar');
+  var sug = document.getElementById('phraseSuggest');
+  if (!bar || !sug) return;
+
+  var exact = _exactPhraseMatch(currentKeys);
+  if (exact) {
+    bar.innerHTML = '<span class="pred-complete">✅ ' + exact.fr + '</span>';
+    sug.textContent = '';
+    clearTimeout(_phraseCompleteTimer);
+    _phraseCompleteTimer = setTimeout(function() {
+      appLog('ok', '📢 Phrase reconnue — lecture : «' + exact.fr + '»');
+      speakFR(exact.fr);
+    }, 600);
+    return;
+  }
+
+  var preds = getPredictions(currentKeys);
+  var hint  = _bestPhraseHint(currentKeys);
+  sug.innerHTML = hint ? '<span>→ <em>' + hint.fr + '</em></span>' : '';
+
+  if (!preds.length) { bar.innerHTML = ''; return; }
+  var html = '<span class="pred-label">Suite probable :</span>';
+  preds.forEach(function(p) {
+    html += '<button class="pred-btn" onclick="_addPredSign(\'' + p.nextKey + '\')" title="' + p.hint + '">'
+          + p.signObj.emoji + ' ' + p.signObj.fr + '</button>';
+  });
+  bar.innerHTML = html;
+}
+
+function _addPredSign(key) {
+  var obj = _allSigns().find(function(s) { return s.key === key; });
+  if (obj) _addWord(obj);
+}
+
 /* ── CAMERA & DETECTION LOOP ──────────────────────────── */
 var mpH = null, rafId = null, stream = null, running = false;
 var holdKey = null, holdStart = 0, cooldownUntil = 0;
-var sentence = [], debugOn = false;
+var sentence = [], _sentenceObjs = [], debugOn = false;
 var _errCount = 0;
+var _inactivityTimer = null, _phraseCompleteTimer = null;
 var HOLD_MS = 1000;
 // hold ring circumference: 2π × r18 ≈ 113
 var HOLD_CIRC = 113;
@@ -1327,6 +1429,7 @@ function _onDetect(sign, conf, fingers) {
 function _addWord(sign) {
   var idx = sentence.length;
   sentence.push(sign.fr);
+  _sentenceObjs.push(sign);
   var empty = document.getElementById('sentEmpty');
   if (empty) empty.remove();
   var chip = document.createElement('div');
@@ -1335,11 +1438,24 @@ function _addWord(sign) {
   chip.innerHTML = '<span>' + sign.emoji + ' ' + sign.fr + '</span>'
     + '<button onclick="_removeWord(' + idx + ')" title="Supprimer ce mot">✕</button>';
   document.getElementById('sentWrap').appendChild(chip);
+  _updatePredictions();
+  // Inactivity auto-read (3s after last sign, ≥2 mots)
+  clearTimeout(_inactivityTimer);
+  _inactivityTimer = setTimeout(function() {
+    if (sentence.length < 2) return;
+    var keys = _sentenceObjs.map(function(s) { return s.key; });
+    var exact = _exactPhraseMatch(keys);
+    var txt = exact ? exact.fr : sentence.join(', ');
+    appLog('info', '⏱ Lecture auto : «' + txt + '»');
+    speakFR(txt);
+  }, 3000);
 }
 
 function _removeWord(idx) {
   sentence.splice(idx, 1);
+  _sentenceObjs.splice(idx, 1);
   _rebuildSent();
+  _updatePredictions();
   appLog('info', 'Mot retiré — phrase: [' + sentence.join(', ') + ']');
 }
 
@@ -1353,14 +1469,17 @@ function _rebuildSent() {
   sentence.forEach(function(w, i) {
     var chip = document.createElement('div');
     chip.className = 'word-chip';
-    chip.innerHTML = '<span>' + w + '</span><button onclick="_removeWord(' + i + ')" title="Supprimer">✕</button>';
+    var em = (_sentenceObjs[i] && _sentenceObjs[i].emoji) ? _sentenceObjs[i].emoji + ' ' : '';
+    chip.innerHTML = '<span>' + em + w + '</span><button onclick="_removeWord(' + i + ')" title="Supprimer">✕</button>';
     wrap.appendChild(chip);
   });
 }
 
 function clearSentence() {
-  sentence = []; holdKey = null; holdStart = 0; cooldownUntil = 0;
+  sentence = []; _sentenceObjs = []; holdKey = null; holdStart = 0; cooldownUntil = 0;
+  clearTimeout(_inactivityTimer); clearTimeout(_phraseCompleteTimer);
   _rebuildSent();
+  _updatePredictions();
   appLog('info', 'Phrase effacée');
 }
 
@@ -1393,8 +1512,10 @@ function speakFR(text) {
 
 function speakSentence() {
   if (!sentence.length) { speakFR('Aucun mot'); return; }
-  var txt = sentence.join(', ');
-  appLog('info', 'Lecture vocale: «' + txt + '»');
+  var keys = _sentenceObjs.map(function(s) { return s.key; });
+  var exact = _exactPhraseMatch(keys);
+  var txt = exact ? exact.fr : sentence.join(', ');
+  appLog('info', '🔊 Lecture : «' + txt + '»' + (exact ? ' (phrase naturelle)' : ''));
   speakFR(txt);
 }
 

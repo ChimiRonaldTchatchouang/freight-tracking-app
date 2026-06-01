@@ -27,20 +27,17 @@ _mp_status = {'ready': False, 'done': 0, 'total': len(_MP_FILES)}
 _ASSERT_PAT = re.compile(
     r'Object\.getOwnPropertyDescriptor\(Module,\s*["\']arguments["\']\)'
 )
-# Matches the defineProperty getter: someFunc("Module.arguments has been replaced...")
-# Works even if 'abort' is renamed by the minifier (e.g. 'la', 'ia', etc.)
 _ABORT_ARGS_PAT = re.compile(
     r'\b\w+\s*\(\s*["\']Module\.arguments has been replaced[^"\']*["\']\s*\)'
 )
+_PATCH_VER = '3'  # bump whenever patching logic changes to force cache invalidation
 
 def _patch_mp(fname, raw):
     """Neutralise two Emscripten checks that conflict with hands.js Module.arguments."""
     if fname in ('hands_solution_simd_wasm_bin.js', 'hands_solution_wasm_bin.js'):
         try:
             text = raw.decode('utf-8')
-            # Patch 1: assert(!Object.getOwnPropertyDescriptor(Module,"arguments"),...)
             p1 = _ASSERT_PAT.sub('false', text)
-            # Patch 2: getter abort("Module.arguments has been replaced...") in defineProperty
             p2 = _ABORT_ARGS_PAT.sub('(0)', p1)
             n = (p1 != text) + (p2 != p1)
             if n:
@@ -52,6 +49,16 @@ def _patch_mp(fname, raw):
 
 def _download_mp():
     _MP_DIR.mkdir(exist_ok=True)
+    # Invalidate cache if patch version changed (Render may keep /tmp between hot deploys)
+    ver_file = _MP_DIR / '.patch_ver'
+    if not ver_file.exists() or ver_file.read_text().strip() != _PATCH_VER:
+        print(f'[MP] patch version changed → clearing cache for re-download')
+        for old in _MP_DIR.glob('*.js'):
+            old.unlink(missing_ok=True)
+        for old in _MP_DIR.glob('*.wasm'):
+            old.unlink(missing_ok=True)
+        _mp_status['done'] = 0
+
     for url, fname in _MP_FILES:
         dest = _MP_DIR / fname
         if dest.exists() and dest.stat().st_size > 100:
@@ -69,6 +76,8 @@ def _download_mp():
                 if attempt < 2:
                     time.sleep(2 ** attempt)
     _mp_status['ready'] = (_mp_status['done'] == _mp_status['total'])
+    if _mp_status['ready']:
+        ver_file.write_text(_PATCH_VER)
     print(f'[MP] ready={_mp_status["ready"]} — {_mp_status["done"]}/{_mp_status["total"]} files in {_MP_DIR}')
 
 threading.Thread(target=_download_mp, daemon=True).start()
@@ -1246,19 +1255,23 @@ async function startCam() {
     appLog('ok', 'Mode local — fichiers WASM déjà patchés côté serveur, Blob URL non utilisé ✓');
   }
 
-  mpH = new Hands({
-    locateFile: function(f) {
-      // SIMD absent → redirect vers équivalent non-SIMD
-      if (!simdOk && f.indexOf('simd_wasm_bin') !== -1) {
-        f = f.replace('simd_wasm_bin', 'wasm_bin');
-      }
-      // CDN mode: retourner Blob URL patché si disponible
-      if (patchedUrls[f]) return patchedUrls[f];
-      return _useLocal
-        ? '/mp/' + f
-        : 'https://unpkg.com/@mediapipe/hands@0.4.1646424915/' + f;
+  // Pre-define window.Module with locateFile so that hands_solution_packed_assets_loader.js
+  // (loaded as a global script) shares the same Module object as hands_solution_simd_wasm_bin.js.
+  // Both files do: var Module = typeof Module !== 'undefined' ? Module : {}
+  // Pre-defining ensures they reference the same global instance.
+  function _mpLocate(f) {
+    if (!simdOk && f.indexOf('simd_wasm_bin') !== -1) {
+      f = f.replace('simd_wasm_bin', 'wasm_bin');
     }
-  });
+    if (patchedUrls[f]) return patchedUrls[f];
+    return _useLocal
+      ? '/mp/' + f
+      : 'https://unpkg.com/@mediapipe/hands@0.4.1646424915/' + f;
+  }
+  window.Module = (typeof window.Module === 'object' && window.Module) ? window.Module : {};
+  window.Module['locateFile'] = _mpLocate;
+
+  mpH = new Hands({ locateFile: _mpLocate });
 
   mpH.setOptions({
     maxNumHands: 2,
@@ -1352,6 +1365,8 @@ function stopCam() {
   if (mpH)    { try { mpH.close(); } catch(_) {} mpH = null; }
   if (stream) { stream.getTracks().forEach(function(t) { t.stop(); }); stream = null; }
   _revokeBlobUrls();
+  // Reset global Module so next startCam() gets a fresh instance
+  try { delete window.Module; } catch(_) { window.Module = undefined; }
   document.getElementById('cvs').getContext('2d').clearRect(0, 0, 9999, 9999);
   appLog('info', 'Caméra et modèle arrêtés');
   _resetCamUI();

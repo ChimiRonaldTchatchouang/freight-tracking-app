@@ -492,6 +492,13 @@ textarea{resize:vertical;min-height:100px;grid-column:1/-1}
 .met{background:#f9f9fb;border-radius:9px;padding:.7rem;text-align:center;border:1px solid #eee}
 .mv{font-size:20px;font-weight:800;color:var(--brand)}.ml{font-size:9px;color:#aaa;margin-top:2px;text-transform:uppercase;font-weight:700}
 
+/* ── AVATAR ── */
+.av-btn{padding:.2rem .65rem;border:1px solid var(--border);border-radius:6px;background:var(--card);cursor:pointer;font-size:10px;color:var(--muted);font-weight:700;transition:all .15s}
+.av-btn:hover{background:#e0e7ff;color:var(--brand)}
+.av-caption{margin-top:.45rem;font-size:12px;color:var(--brand);min-height:1.4em;font-weight:700;letter-spacing:.04em;text-align:center}
+.gtag.av-active{box-shadow:0 0 0 3px #f59e0b !important;background:linear-gradient(135deg,#f59e0b,#f97316) !important}
+#avatarCanvas{display:block;margin:0 auto}
+
 /* ── LOG PANEL ── */
 .log-panel{background:var(--card);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden}
 .log-toggle{display:flex;align-items:center;justify-content:space-between;padding:.6rem 1rem;cursor:pointer;user-select:none;background:#f8fafc}
@@ -707,6 +714,17 @@ textarea{resize:vertical;min-height:100px;grid-column:1/-1}
           <div class="met"><div class="mv" id="mC">—</div><div class="ml">Confiance</div></div>
           <div class="met"><div class="mv" id="mT">—</div><div class="ml">Temps ms</div></div>
         </div>
+      </div>
+      <div class="result-block" id="avatarWrap" style="display:none">
+        <div class="sec-hdr" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.65rem">
+          <span>🤟 Avatar LSF</span>
+          <div style="display:flex;gap:.4rem">
+            <button class="av-btn" onclick="replayAvatar()">↺ Rejouer</button>
+            <button class="av-btn" onclick="document.getElementById('avatarWrap').style.display='none'">✕</button>
+          </div>
+        </div>
+        <canvas id="avatarCanvas" width="340" height="400" style="border-radius:12px;max-width:100%;border:1px solid #d4caf0;background:#eef2ff"></canvas>
+        <div class="av-caption" id="avCaption"></div>
       </div>
     </div>
   </div>
@@ -1812,6 +1830,7 @@ function _renderResult(d, orig) {
   document.getElementById('mT').textContent = d.time || 0;
   document.getElementById('signCard').classList.remove('active');
   document.getElementById('textResult').style.display = 'block';
+  playGlosses(d.glosses);
 }
 
 function _showCard(g, el) {
@@ -1831,12 +1850,465 @@ function _showCard(g, el) {
 function clearText() {
   document.getElementById('inputText').value = '';
   document.getElementById('textResult').style.display = 'none';
+  document.getElementById('avatarWrap').style.display = 'none';
+}
+
+/* ── 2D AVATAR ENGINE ──────────────────────────────────── */
+var AV = {
+  W:340, H:400,
+  headX:170, headY:60, headR:36,
+  shLX:105, shRX:235, shY:130,
+  bodyX:170, bodyY1:130, bodyY2:275,
+  hipLX:145, hipRX:195, hipY:275,
+  kneLX:125, kneRX:215, kneY:335,
+  ftLX:115, ftRX:225, ftY:390
+};
+
+var _REST_POSE = {
+  rEX:255, rEY:195, rWX:250, rWY:278,
+  lEX:85,  lEY:195, lWX:90,  lWY:278,
+  rF:[1,0,0,0,0], lF:[1,0,0,0,0], face:0
+};
+
+var _avState = null, _avFrames = [], _avFI = 0, _avStart = 0;
+var _avRAF = 0, _avPlaying = false;
+var _avCanvas = null, _avCtx = null;
+var _avGlosses = [], _avGlossIdx = -1;
+
+/* Sign poses: rEX/rEY=right elbow, rWX/rWY=right wrist,
+   lEX/lEY=left elbow, lWX/lWY=left wrist,
+   rF/lF=[thumb,index,middle,ring,pinky] 0-1,
+   face: 0=neutral 1=smile 2=question 3=sad, dur=ms */
+var AV_SIGNS = {
+  'BONJOUR':[
+    {rEX:218,rEY:98, rWX:228,rWY:52, rF:[1,1,1,1,1],face:1,dur:260},
+    {rEX:210,rEY:95, rWX:244,rWY:49, rF:[1,1,1,1,1],face:1,dur:260},
+    {rEX:222,rEY:98, rWX:232,rWY:52, rF:[1,1,1,1,1],face:1,dur:260},
+    {rEX:212,rEY:95, rWX:246,rWY:48, rF:[1,1,1,1,1],face:1,dur:260},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'AU_REVOIR':[
+    {rEX:215,rEY:103,rWX:240,rWY:58, rF:[1,1,1,1,1],face:1,dur:200},
+    {rEX:230,rEY:98, rWX:265,rWY:63, rF:[1,1,1,1,1],face:1,dur:200},
+    {rEX:215,rEY:103,rWX:240,rWY:58, rF:[1,1,1,1,1],face:1,dur:200},
+    {rEX:232,rEY:98, rWX:268,rWY:60, rF:[1,1,1,1,1],face:1,dur:200},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'MERCI':[
+    {rEX:215,rEY:133,rWX:190,rWY:97, rF:[1,1,1,1,1],face:1,dur:300},
+    {rEX:230,rEY:148,rWX:210,rWY:128,rF:[1,1,1,1,1],face:1,dur:400},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'OUI':[
+    {rEX:220,rEY:148,rWX:195,rWY:118,rF:[1,0,0,0,0],face:0,dur:200},
+    {rEX:220,rEY:153,rWX:195,rWY:130,rF:[1,0,0,0,0],face:0,dur:200},
+    {rEX:220,rEY:147,rWX:195,rWY:116,rF:[1,0,0,0,0],face:0,dur:200},
+    {rEX:220,rEY:153,rWX:195,rWY:129,rF:[1,0,0,0,0],face:0,dur:200},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:350}
+  ],
+  'NON':[
+    {rEX:230,rEY:143,rWX:215,rWY:108,rF:[0,1,0,0,0],face:0,dur:200},
+    {rEX:235,rEY:143,rWX:247,rWY:106,rF:[0,1,0,0,0],face:0,dur:200},
+    {rEX:225,rEY:143,rWX:200,rWY:108,rF:[0,1,0,0,0],face:0,dur:200},
+    {rEX:235,rEY:143,rWX:250,rWY:106,rF:[0,1,0,0,0],face:0,dur:200},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:350}
+  ],
+  "S'IL_VOUS_PLAIT":[
+    {rEX:210,rEY:158,rWX:185,rWY:173,rF:[1,1,1,1,1],face:0,dur:400},
+    {rEX:210,rEY:163,rWX:185,rWY:183,rF:[1,1,1,1,1],face:0,dur:300},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'SVP':[
+    {rEX:210,rEY:158,rWX:185,rWY:173,rF:[1,1,1,1,1],face:0,dur:400},
+    {rEX:210,rEY:163,rWX:185,rWY:183,rF:[1,1,1,1,1],face:0,dur:300},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'COMMENT':[
+    {rEX:225,rEY:173,rWX:260,rWY:223,rF:[1,1,1,1,1],lEX:115,lEY:173,lWX:80,lWY:223,lF:[1,1,1,1,1],face:2,dur:500},
+    {rEX:225,rEY:168,rWX:262,rWY:213,rF:[1,1,1,1,1],lEX:115,lEY:168,lWX:78,lWY:213,lF:[1,1,1,1,1],face:2,dur:400},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],lEX:85,lEY:195,lWX:90,lWY:278,lF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'MANGER':[
+    {rEX:225,rEY:143,rWX:196,rWY:93, rF:[0,1,1,0,0],face:0,dur:300},
+    {rEX:220,rEY:138,rWX:186,rWY:86, rF:[0,1,1,0,0],face:0,dur:200},
+    {rEX:222,rEY:141,rWX:192,rWY:90, rF:[0,1,1,0,0],face:0,dur:200},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'BOIRE':[
+    {rEX:220,rEY:143,rWX:190,rWY:93, rF:[1,1,0,0,0],face:0,dur:400},
+    {rEX:218,rEY:138,rWX:186,rWY:86, rF:[1,1,0,0,0],face:0,dur:300},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'AIMER':[
+    {rEX:210,rEY:163,rWX:180,rWY:173,rF:[1,0,0,0,0],face:1,dur:500},
+    {rEX:210,rEY:160,rWX:180,rWY:168,rF:[1,0,0,0,0],face:1,dur:300},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'AIMER_BIEN':[
+    {rEX:210,rEY:163,rWX:180,rWY:173,rF:[1,0,0,0,0],face:1,dur:500},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'BON':[
+    {rEX:240,rEY:163,rWX:248,rWY:128,rF:[1,0,0,0,0],face:1,dur:600},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'BIEN':[
+    {rEX:240,rEY:163,rWX:248,rWY:128,rF:[1,0,0,0,0],face:1,dur:600},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'MAUVAIS':[
+    {rEX:240,rEY:163,rWX:248,rWY:198,rF:[1,0,0,0,0],face:3,dur:600},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'JE':[
+    {rEX:210,rEY:163,rWX:183,rWY:176,rF:[0,1,0,0,0],face:0,dur:500},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:350}
+  ],
+  'MOI':[
+    {rEX:210,rEY:163,rWX:183,rWY:176,rF:[0,1,0,0,0],face:0,dur:500},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:350}
+  ],
+  'TU':[
+    {rEX:235,rEY:168,rWX:292,rWY:166,rF:[0,1,0,0,0],face:0,dur:500},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:350}
+  ],
+  'VOUS':[
+    {rEX:235,rEY:168,rWX:292,rWY:166,rF:[0,1,0,0,0],face:0,dur:500},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:350}
+  ],
+  'IL':[
+    {rEX:255,rEY:166,rWX:310,rWY:163,rF:[0,1,0,0,0],face:0,dur:500},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:350}
+  ],
+  'ELLE':[
+    {rEX:255,rEY:166,rWX:310,rWY:163,rF:[0,1,0,0,0],face:0,dur:500},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:350}
+  ],
+  'NOUS':[
+    {rEX:210,rEY:163,rWX:183,rWY:176,rF:[0,1,0,0,0],face:0,dur:300},
+    {rEX:230,rEY:163,rWX:257,rWY:168,rF:[0,1,0,0,0],face:0,dur:400},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:350}
+  ],
+  'GRAND':[
+    {rEX:258,rEY:143,rWX:288,rWY:108,rF:[1,0,0,0,0],lEX:82,lEY:143,lWX:52,lWY:108,lF:[1,0,0,0,0],face:0,dur:600},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],lEX:85,lEY:195,lWX:90,lWY:278,lF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'PETIT':[
+    {rEX:205,rEY:178,rWX:185,rWY:208,rF:[1,0,0,0,0],lEX:135,lEY:178,lWX:155,lWY:208,lF:[1,0,0,0,0],face:0,dur:600},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],lEX:85,lEY:195,lWX:90,lWY:278,lF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'COMPRENDRE':[
+    {rEX:220,rEY:108,rWX:208,rWY:73, rF:[0,1,0,0,0],face:0,dur:600},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'SAVOIR':[
+    {rEX:210,rEY:103,rWX:188,rWY:60, rF:[1,1,1,1,1],face:0,dur:600},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'MAISON':[
+    {rEX:210,rEY:128,rWX:170,rWY:93, rF:[1,1,1,1,1],lEX:130,lEY:128,lWX:170,lWY:93,lF:[1,1,1,1,1],face:0,dur:500},
+    {rEX:225,rEY:153,rWX:225,rWY:178,rF:[1,1,1,1,1],lEX:115,lEY:153,lWX:115,lWY:178,lF:[1,1,1,1,1],face:0,dur:400},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],lEX:85,lEY:195,lWX:90,lWY:278,lF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'EAU':[
+    {rEX:218,rEY:138,rWX:192,rWY:98, rF:[0,1,1,1,0],face:0,dur:600},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'ARGENT':[
+    {rEX:235,rEY:173,rWX:255,rWY:213,rF:[1,1,1,0,0],face:0,dur:300},
+    {rEX:235,rEY:173,rWX:258,rWY:220,rF:[1,0,0,0,0],face:0,dur:300},
+    {rEX:235,rEY:173,rWX:255,rWY:213,rF:[1,1,1,0,0],face:0,dur:300},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'TRAVAILLER':[
+    {rEX:220,rEY:173,rWX:210,rWY:213,rF:[1,0,0,0,0],lEX:120,lEY:173,lWX:130,lWY:213,lF:[1,0,0,0,0],face:0,dur:250},
+    {rEX:215,rEY:170,rWX:205,rWY:208,rF:[1,0,0,0,0],lEX:125,lEY:170,lWX:135,lWY:208,lF:[1,0,0,0,0],face:0,dur:250},
+    {rEX:220,rEY:173,rWX:210,rWY:213,rF:[1,0,0,0,0],lEX:120,lEY:173,lWX:130,lWY:213,lF:[1,0,0,0,0],face:0,dur:250},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],lEX:85,lEY:195,lWX:90,lWY:278,lF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'HEUREUX':[
+    {rEX:210,rEY:163,rWX:185,rWY:170,rF:[1,1,1,1,1],face:1,dur:250},
+    {rEX:210,rEY:153,rWX:185,rWY:160,rF:[1,1,1,1,1],face:1,dur:250},
+    {rEX:212,rEY:160,rWX:188,rWY:166,rF:[1,1,1,1,1],face:1,dur:250},
+    {rEX:210,rEY:150,rWX:185,rWY:156,rF:[1,1,1,1,1],face:1,dur:250},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'CONTENT':[
+    {rEX:210,rEY:163,rWX:185,rWY:170,rF:[1,1,1,1,1],face:1,dur:250},
+    {rEX:210,rEY:153,rWX:185,rWY:160,rF:[1,1,1,1,1],face:1,dur:250},
+    {rEX:212,rEY:160,rWX:188,rWY:166,rF:[1,1,1,1,1],face:1,dur:250},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'TRISTE':[
+    {rEX:205,rEY:133,rWX:180,rWY:106,rF:[1,1,1,1,1],lEX:135,lEY:133,lWX:160,lWY:106,lF:[1,1,1,1,1],face:3,dur:400},
+    {rEX:210,rEY:148,rWX:185,rWY:128,rF:[1,1,1,1,1],lEX:130,lEY:148,lWX:155,lWY:128,lF:[1,1,1,1,1],face:3,dur:500},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],lEX:85,lEY:195,lWX:90,lWY:278,lF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'ALLER':[
+    {rEX:238,rEY:168,rWX:275,rWY:166,rF:[0,1,0,0,0],face:0,dur:300},
+    {rEX:242,rEY:166,rWX:292,rWY:163,rF:[0,1,0,0,0],face:0,dur:300},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'VENIR':[
+    {rEX:245,rEY:166,rWX:294,rWY:160,rF:[0,1,0,0,0],face:0,dur:300},
+    {rEX:235,rEY:168,rWX:274,rWY:166,rF:[0,1,0,0,0],face:0,dur:300},
+    {rEX:245,rEY:166,rWX:292,rWY:160,rF:[0,1,0,0,0],face:0,dur:300},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'CHAUD':[
+    {rEX:220,rEY:138,rWX:195,rWY:93, rF:[1,1,0,0,0],face:0,dur:300},
+    {rEX:228,rEY:153,rWX:210,rWY:113,rF:[1,1,0,0,0],face:0,dur:400},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'FROID':[
+    {rEX:218,rEY:173,rWX:208,rWY:216,rF:[1,0,0,0,0],lEX:122,lEY:173,lWX:132,lWY:216,lF:[1,0,0,0,0],face:0,dur:180},
+    {rEX:215,rEY:176,rWX:205,rWY:220,rF:[1,0,0,0,0],lEX:125,lEY:176,lWX:135,lWY:220,lF:[1,0,0,0,0],face:0,dur:180},
+    {rEX:218,rEY:172,rWX:208,rWY:215,rF:[1,0,0,0,0],lEX:122,lEY:172,lWX:132,lWY:215,lF:[1,0,0,0,0],face:0,dur:180},
+    {rEX:215,rEY:176,rWX:205,rWY:220,rF:[1,0,0,0,0],lEX:125,lEY:176,lWX:135,lWY:220,lF:[1,0,0,0,0],face:0,dur:180},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],lEX:85,lEY:195,lWX:90,lWY:278,lF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'FATIGUE':[
+    {rEX:248,rEY:203,rWX:240,rWY:280,rF:[1,0,0,0,0],lEX:92,lEY:203,lWX:100,lWY:280,lF:[1,0,0,0,0],face:3,dur:700},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],lEX:85,lEY:195,lWX:90,lWY:278,lF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'VRAI':[
+    {rEX:235,rEY:163,rWX:255,rWY:193,rF:[1,1,1,1,1],face:0,dur:350},
+    {rEX:235,rEY:168,rWX:255,rWY:208,rF:[1,1,1,1,1],face:0,dur:350},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'DONNER':[
+    {rEX:220,rEY:168,rWX:195,rWY:183,rF:[1,1,1,1,1],face:0,dur:300},
+    {rEX:235,rEY:166,rWX:268,rWY:180,rF:[1,1,1,1,1],face:0,dur:400},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'VOULOIR':[
+    {rEX:218,rEY:158,rWX:190,rWY:166,rF:[1,1,1,0,0],face:0,dur:400},
+    {rEX:220,rEY:160,rWX:192,rWY:170,rF:[1,0,0,0,0],face:0,dur:400},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'PROMETTRE':[
+    {rEX:220,rEY:138,rWX:196,rWY:90, rF:[0,1,0,0,0],face:0,dur:300},
+    {rEX:238,rEY:156,rWX:272,rWY:153,rF:[0,1,0,0,0],face:0,dur:400},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'MONDE':[
+    {rEX:215,rEY:163,rWX:195,rWY:188,rF:[1,0,0,0,1],lEX:125,lEY:163,lWX:145,lWY:188,lF:[1,0,0,0,1],face:0,dur:350},
+    {rEX:210,rEY:166,rWX:192,rWY:191,rF:[1,0,0,0,1],lEX:130,lEY:166,lWX:148,lWY:191,lF:[1,0,0,0,1],face:0,dur:350},
+    {rEX:215,rEY:163,rWX:195,rWY:188,rF:[1,0,0,0,1],lEX:125,lEY:163,lWX:145,lWY:188,lF:[1,0,0,0,1],face:0,dur:350},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],lEX:85,lEY:195,lWX:90,lWY:278,lF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'DIEU':[
+    {rEX:225,rEY:118,rWX:218,rWY:80, rF:[0,1,0,0,0],face:1,dur:600},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'FORT':[
+    {rEX:228,rEY:156,rWX:215,rWY:126,rF:[1,0,0,0,0],face:0,dur:400},
+    {rEX:222,rEY:150,rWX:210,rWY:120,rF:[1,0,0,0,0],face:0,dur:300},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'CONDUIRE':[
+    {rEX:215,rEY:163,rWX:198,rWY:186,rF:[1,0,0,0,0],lEX:125,lEY:163,lWX:142,lWY:186,lF:[1,0,0,0,0],face:0,dur:300},
+    {rEX:218,rEY:160,rWX:200,rWY:180,rF:[1,0,0,0,0],lEX:122,lEY:160,lWX:140,lWY:180,lF:[1,0,0,0,0],face:0,dur:300},
+    {rEX:215,rEY:163,rWX:198,rWY:186,rF:[1,0,0,0,0],lEX:125,lEY:163,lWX:142,lWY:186,lF:[1,0,0,0,0],face:0,dur:300},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],lEX:85,lEY:195,lWX:90,lWY:278,lF:[1,0,0,0,0],face:0,dur:400}
+  ],
+  'ARBRE':[
+    {rEX:200,rEY:153,rWX:188,rWY:116,rF:[1,1,1,1,1],lEX:120,lEY:188,lWX:110,lWY:213,lF:[1,1,1,1,1],face:0,dur:700},
+    {rEX:255,rEY:195,rWX:250,rWY:278,rF:[1,0,0,0,0],lEX:85,lEY:195,lWX:90,lWY:278,lF:[1,0,0,0,0],face:0,dur:400}
+  ]
+};
+
+function initAvatar() {
+  _avCanvas = document.getElementById('avatarCanvas');
+  if (!_avCanvas) return;
+  _avCtx = _avCanvas.getContext('2d');
+  _avState = _avFillPose({});
+  _drawAv(_avState);
+}
+
+function _avFillPose(frame) {
+  var r = _REST_POSE;
+  return {
+    rEX: frame.rEX !== undefined ? frame.rEX : r.rEX,
+    rEY: frame.rEY !== undefined ? frame.rEY : r.rEY,
+    rWX: frame.rWX !== undefined ? frame.rWX : r.rWX,
+    rWY: frame.rWY !== undefined ? frame.rWY : r.rWY,
+    lEX: frame.lEX !== undefined ? frame.lEX : r.lEX,
+    lEY: frame.lEY !== undefined ? frame.lEY : r.lEY,
+    lWX: frame.lWX !== undefined ? frame.lWX : r.lWX,
+    lWY: frame.lWY !== undefined ? frame.lWY : r.lWY,
+    rF: (frame.rF || r.rF).slice(),
+    lF: (frame.lF || r.lF).slice(),
+    face: frame.face !== undefined ? frame.face : 0
+  };
+}
+
+function _avLerpPose(a, b, t) {
+  function li(x, y) { return x + (y - x) * t; }
+  return {
+    rEX:li(a.rEX,b.rEX), rEY:li(a.rEY,b.rEY),
+    rWX:li(a.rWX,b.rWX), rWY:li(a.rWY,b.rWY),
+    lEX:li(a.lEX,b.lEX), lEY:li(a.lEY,b.lEY),
+    lWX:li(a.lWX,b.lWX), lWY:li(a.lWY,b.lWY),
+    rF: a.rF.map(function(v,i){ return li(v, b.rF[i]); }),
+    lF: a.lF.map(function(v,i){ return li(v, b.lF[i]); }),
+    face: t < 0.5 ? a.face : b.face
+  };
+}
+
+function _avEase(t) { return t < 0.5 ? 2*t*t : -1+(4-2*t)*t; }
+
+function _avLoop(ts) {
+  if (!_avPlaying) return;
+  if (_avFI >= _avFrames.length) {
+    _avPlaying = false;
+    _drawAv(_avFillPose(_avFrames[_avFrames.length - 1]));
+    _updateGlossHL(-1);
+    var cap = document.getElementById('avCaption');
+    if (cap) cap.textContent = '';
+    return;
+  }
+  var fr = _avFrames[_avFI];
+  var elapsed = ts - _avStart;
+  var t = _avEase(Math.min(elapsed / fr.dur, 1));
+  var prev = _avFI === 0 ? _avState : _avFillPose(_avFrames[_avFI - 1]);
+  _drawAv(_avLerpPose(prev, _avFillPose(fr), t));
+  if (elapsed >= fr.dur) {
+    _avFI++;
+    _avStart = ts;
+    if (_avFI < _avFrames.length) {
+      var ni = _avFrames[_avFI]._glossIdx;
+      if (ni !== _avGlossIdx) {
+        _avGlossIdx = ni;
+        _updateGlossHL(ni);
+        _avSetCaption(ni);
+      }
+    }
+  }
+  _avRAF = requestAnimationFrame(_avLoop);
+}
+
+function _updateGlossHL(idx) {
+  document.querySelectorAll('.gtag').forEach(function(t, i) {
+    t.classList.toggle('av-active', i === idx);
+  });
+}
+
+function _avSetCaption(idx) {
+  var cap = document.getElementById('avCaption');
+  if (cap) cap.textContent = (idx >= 0 && idx < _avGlosses.length) ? _avGlosses[idx] : '';
+}
+
+function playGlosses(glosses) {
+  if (!_avCtx) initAvatar();
+  if (!_avCtx) return;
+  _avGlosses = glosses || [];
+  _avFrames = [];
+  for (var i = 0; i < _avGlosses.length; i++) {
+    var key = _avGlosses[i].toUpperCase()
+      .replace(/[\s\-']/g, '_').replace(/[^A-Z0-9_]/g, '');
+    var frs = AV_SIGNS[key] || [{dur: 380}];
+    for (var j = 0; j < frs.length; j++) {
+      _avFrames.push(Object.assign({}, frs[j], {_glossIdx: i}));
+    }
+    _avFrames.push({dur: 220, _glossIdx: i});
+  }
+  if (_avFrames.length === 0) return;
+  document.getElementById('avatarWrap').style.display = 'block';
+  if (_avRAF) { cancelAnimationFrame(_avRAF); _avRAF = 0; }
+  _avFI = 0;
+  _avPlaying = true;
+  _avGlossIdx = _avFrames[0]._glossIdx;
+  _updateGlossHL(_avGlossIdx);
+  _avSetCaption(_avGlossIdx);
+  _avRAF = requestAnimationFrame(function(ts) { _avStart = ts; _avLoop(ts); });
+}
+
+function replayAvatar() {
+  if (_avGlosses.length) playGlosses(_avGlosses);
+}
+
+function _avLine(ctx, x1, y1, x2, y2) {
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+}
+
+function _avCurve(ctx, x1, y1, cx, cy, x2, y2) {
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.quadraticCurveTo(cx, cy, x2, y2); ctx.stroke();
+}
+
+function _drawHand(ctx, wx, wy, fingers, isRight) {
+  ctx.fillStyle = '#fde9d5'; ctx.strokeStyle = '#4338ca'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(wx, wy, 11, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  var d = isRight ? 1 : -1;
+  var angles = [d * (-0.45 * Math.PI), d * (-0.25 * Math.PI), -0.5 * Math.PI,
+                d * (0.15 * Math.PI), d * (0.35 * Math.PI)];
+  var lens = [16, 20, 22, 18, 15];
+  ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.strokeStyle = '#4338ca';
+  for (var i = 0; i < 5; i++) {
+    if (fingers[i] < 0.3) continue;
+    var a = angles[i], l = lens[i] * fingers[i];
+    ctx.beginPath(); ctx.moveTo(wx, wy);
+    ctx.lineTo(wx + Math.sin(a) * l, wy - Math.cos(a) * l);
+    ctx.stroke();
+  }
+}
+
+function _drawFace(ctx, face) {
+  var x = AV.headX, y = AV.headY;
+  ctx.fillStyle = '#1e1b4b';
+  ctx.beginPath(); ctx.arc(x - 12, y - 8, 3.5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x + 12, y - 8, 3.5, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#1e1b4b'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+  if (face === 2) {
+    ctx.beginPath(); ctx.moveTo(x-18,y-17); ctx.quadraticCurveTo(x-12,y-23,x-6,y-17); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x+6, y-17); ctx.quadraticCurveTo(x+12,y-23,x+18,y-17); ctx.stroke();
+  } else if (face === 3) {
+    ctx.beginPath(); ctx.moveTo(x-18,y-19); ctx.quadraticCurveTo(x-12,y-15,x-6,y-19); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x+6, y-19); ctx.quadraticCurveTo(x+12,y-15,x+18,y-19); ctx.stroke();
+  } else {
+    _avLine(ctx, x-18, y-18, x-6, y-18);
+    _avLine(ctx, x+6,  y-18, x+18, y-18);
+  }
+  ctx.lineWidth = 2.5;
+  if (face === 1) {
+    ctx.beginPath(); ctx.arc(x, y+10, 11, 0.1*Math.PI, 0.9*Math.PI); ctx.stroke();
+  } else if (face === 3) {
+    ctx.beginPath(); ctx.arc(x, y+22, 11, 1.1*Math.PI, 1.9*Math.PI); ctx.stroke();
+  } else {
+    _avLine(ctx, x-9, y+10, x+9, y+10);
+  }
+}
+
+function _drawAv(s) {
+  var ctx = _avCtx;
+  ctx.clearRect(0, 0, AV.W, AV.H);
+  var bg = ctx.createLinearGradient(0, 0, 0, AV.H);
+  bg.addColorStop(0, '#eef2ff'); bg.addColorStop(1, '#dde5ff');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, AV.W, AV.H);
+  ctx.strokeStyle = '#4338ca'; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.lineWidth = 7;
+  _avLine(ctx, AV.hipLX, AV.hipY, AV.kneLX, AV.kneY);
+  _avLine(ctx, AV.kneLX, AV.kneY, AV.ftLX, AV.ftY);
+  _avLine(ctx, AV.hipRX, AV.hipY, AV.kneRX, AV.kneY);
+  _avLine(ctx, AV.kneRX, AV.kneY, AV.ftRX, AV.ftY);
+  ctx.lineWidth = 9;
+  _avLine(ctx, AV.bodyX, AV.bodyY1, AV.bodyX, AV.bodyY2);
+  ctx.lineWidth = 7;
+  _avCurve(ctx, AV.shLX, AV.shY, s.lEX, s.lEY, s.lWX, s.lWY);
+  _avCurve(ctx, AV.shRX, AV.shY, s.rEX, s.rEY, s.rWX, s.rWY);
+  _drawHand(ctx, s.rWX, s.rWY, s.rF, true);
+  _drawHand(ctx, s.lWX, s.lWY, s.lF, false);
+  ctx.lineWidth = 4; ctx.fillStyle = '#fde9d5'; ctx.strokeStyle = '#4338ca';
+  ctx.beginPath(); ctx.arc(AV.headX, AV.headY, AV.headR, 0, Math.PI * 2);
+  ctx.fill(); ctx.stroke();
+  _drawFace(ctx, s.face);
 }
 
 document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('inputText').addEventListener('keydown', function(e) {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) doTranslate();
   });
+  initAvatar();
 });
 </script>
 </body>

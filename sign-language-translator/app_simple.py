@@ -88,9 +88,24 @@ def _dl_one(url_fname):
             time.sleep(2 ** attempt)
     with _dl_lock:
         _mp_status['error'] = last_err
+    try:  # persist to disk so any gunicorn worker can report it via /mp_status
+        (_MP_DIR / '.error').write_text(last_err[:300])
+    except Exception:
+        pass
     return False
 
+_dl_run_lock = threading.Lock()
+
 def _download_mp():
+    # Skip if another thread in this process is already downloading.
+    if not _dl_run_lock.acquire(blocking=False):
+        return
+    try:
+        _download_mp_inner()
+    finally:
+        _dl_run_lock.release()
+
+def _download_mp_inner():
     _MP_DIR.mkdir(exist_ok=True)
     # Invalidate cache if patch version changed (Render may keep /tmp between hot deploys)
     ver_file = _MP_DIR / '.patch_ver'
@@ -112,16 +127,44 @@ def _download_mp():
         if all(results):
             _mp_status['ready'] = True
             ver_file.write_text(_PATCH_VER)
+            (_MP_DIR / '.error').unlink(missing_ok=True)
             print(f'[MP] ready — {_mp_status["done"]}/{_mp_status["total"]} files in {_MP_DIR}')
             return
         print(f'[MP] round {round_no + 1}: {_mp_status["done"]}/{_mp_status["total"]} OK — retry missing in 5s')
         time.sleep(5)
     print(f'[MP] still incomplete after retries — {_mp_status["done"]}/{_mp_status["total"]}')
 
-threading.Thread(target=_download_mp, daemon=True).start()
+_dl_started = False
+_dl_start_lock = threading.Lock()
+
+def _files_on_disk():
+    return sum(1 for _u, f in _MP_FILES
+               if (_MP_DIR / f).exists() and (_MP_DIR / f).stat().st_size > 100)
+
+def _mp_ready_on_disk():
+    ver_file = _MP_DIR / '.patch_ver'
+    ver_ok = ver_file.exists() and ver_file.read_text().strip() == _PATCH_VER
+    return ver_ok and _files_on_disk() == len(_MP_FILES)
+
+def _ensure_download_started():
+    """Idempotently launch the downloader in THIS worker process. A thread
+    started at import time does not survive a gunicorn fork, so we (re)start it
+    on the first request — guaranteeing it runs in a live, request-serving
+    worker. Readiness is read from the shared /tmp filesystem, so any worker
+    sees the truth regardless of which one did the download."""
+    global _dl_started
+    with _dl_start_lock:
+        if _dl_started:
+            return
+        _dl_started = True
+    threading.Thread(target=_download_mp, daemon=True).start()
+
+# Kick off at import (covers the single-worker / no-fork case).
+_ensure_download_started()
 
 @app.route('/mp/<path:filename>')
 def serve_mp(filename):
+    _ensure_download_started()
     f = (_MP_DIR / filename).resolve()
     mp_root = _MP_DIR.resolve()
     if not (f == mp_root or str(f).startswith(str(mp_root) + '/')):
@@ -138,7 +181,20 @@ def serve_mp(filename):
 
 @app.route('/mp_status')
 def mp_status_route():
-    return jsonify(_mp_status)
+    _ensure_download_started()
+    err = ''
+    ef = _MP_DIR / '.error'
+    if ef.exists():
+        try:
+            err = ef.read_text()[:300]
+        except Exception:
+            err = ''
+    return jsonify({
+        'done':  _files_on_disk(),
+        'total': len(_MP_FILES),
+        'ready': _mp_ready_on_disk(),
+        'error': err,
+    })
 # ─────────────────────────────────────────────────────────────────────────────
 
 SIGN_MAP = {
@@ -2261,6 +2317,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 @app.route('/')
 def index():
+    _ensure_download_started()
     return render_template_string(HTML)
 
 # ── PWA : manifest + service worker (installable / cache hors-ligne) ──

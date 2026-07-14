@@ -35,7 +35,7 @@ def _fetch_bytes(url):
     with urlopen(req, timeout=90) as r:
         return r.read()
 
-_PATCH_VER = '6'  # bump whenever patching logic changes to force cache invalidation
+_PATCH_VER = '7'  # bump whenever patching logic changes to force cache invalidation
 
 # Emscripten installs an ABORTING getter on Module.arguments (and other legacy
 # props) via legacyModuleProp(prop, newName). On modern Chrome the runtime reads
@@ -44,15 +44,20 @@ _PATCH_VER = '6'  # bump whenever patching logic changes to force cache invalida
 # the real code uses the *variable* `prop`, so it never matched. These three
 # independent strategies each key on `prop` — any single match neutralises it:
 _PATCH_STRATEGIES = [
-    # 1. Turn legacyModuleProp into a no-op (covers every legacy prop at once).
-    (re.compile(r'(function\s+legacyModuleProp\s*\([^)]*\)\s*\{)'), r'\1return;'),
-    # 2. Never enter the branch that installs the trap.
-    (re.compile(r'if\s*\(\s*!\s*Object\.getOwnPropertyDescriptor\(\s*Module\s*,\s*prop\s*\)\s*\)'),
-     'if(false)'),
-    # 3. Install the aborting getter on a throwaway object instead of on Module.
-    (re.compile(r'Object\.defineProperty\(\s*Module\s*,\s*prop\s*,'),
-     'Object.defineProperty({},prop,'),
-    # 4. packed_assets_loader.js: on modern Chrome, Module.dataFileDownloads can
+    # 1. Neutralise EVERY Emscripten "trap installer" at once. On modern Chrome
+    #    the runtime reads symbols (arguments, printErr, …) that these functions
+    #    booby-trap with aborting getters/functions on Module. They all share one
+    #    signature: a function whose first statement is
+    #      if(!Object.getOwnPropertyDescriptor(Module, X)){ ...install abort... }
+    #    Injecting `return;` turns them into no-ops, so the missing symbols stay
+    #    undefined and the runtime's own `Module[x] || fallback` paths take over
+    #    (e.g. printErr → console.warn). Covers legacyModuleProp,
+    #    unexportedRuntimeSymbol, unexportedRuntimeFunction and the
+    #    INCOMING_MODULE_JS_API check — present and future.
+    (re.compile(r'(function\s+\w+\s*\([^)]*\)\s*\{)'
+                r'(\s*if\s*\(\s*!\s*Object\.getOwnPropertyDescriptor\(\s*Module\s*,)'),
+     r'\1return;\2'),
+    # 2. packed_assets_loader.js: on modern Chrome, Module.dataFileDownloads can
     #    be undefined in the progress callback's else-branch, throwing on every
     #    onprogress event and flooding the console. Guard the read.
     (re.compile(r'Module\.dataFileDownloads\[url\]\.loaded\s*=\s*event\.loaded;'),

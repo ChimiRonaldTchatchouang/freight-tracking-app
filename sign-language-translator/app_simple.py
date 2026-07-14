@@ -85,14 +85,21 @@ def _download_mp():
             old.unlink(missing_ok=True)
         _mp_status['done'] = 0
 
-    # Download all files in parallel (4 workers) — cuts cold-start from ~2 min to ~30 s
-    with ThreadPoolExecutor(max_workers=4) as ex:
-        results = list(ex.map(_dl_one, _MP_FILES))
-
-    _mp_status['ready'] = all(results)
-    if _mp_status['ready']:
-        ver_file.write_text(_PATCH_VER)
-    print(f'[MP] ready={_mp_status["ready"]} — {_mp_status["done"]}/{_mp_status["total"]} files in {_MP_DIR}')
+    # Download all files in parallel (4 workers) — cuts cold-start from ~2 min to ~30 s.
+    # Retry the whole batch a few times: a transient unpkg failure must NOT leave
+    # the server permanently "not ready" (which would force the crashing CDN path).
+    for round_no in range(6):
+        _mp_status['done'] = 0  # re-counted each round (cached files pass the exists-check)
+        with ThreadPoolExecutor(max_workers=4) as ex:
+            results = list(ex.map(_dl_one, _MP_FILES))
+        if all(results):
+            _mp_status['ready'] = True
+            ver_file.write_text(_PATCH_VER)
+            print(f'[MP] ready — {_mp_status["done"]}/{_mp_status["total"]} files in {_MP_DIR}')
+            return
+        print(f'[MP] round {round_no + 1}: {_mp_status["done"]}/{_mp_status["total"]} OK — retry missing in 5s')
+        time.sleep(5)
+    print(f'[MP] still incomplete after retries — {_mp_status["done"]}/{_mp_status["total"]}')
 
 threading.Thread(target=_download_mp, daemon=True).start()
 
@@ -585,6 +592,12 @@ textarea{resize:vertical;min-height:100px;grid-column:1/-1}
   .sprops{grid-template-columns:1fr}
   .form-grid{grid-template-columns:1fr}
   .brand-sub{display:none}
+  .status-opts{grid-template-columns:1fr}
+}
+@media(max-width:460px){
+  .tlab{display:none}                 /* onglets en icônes seules pour éviter le débordement */
+  .tab-btn{padding:.38rem .55rem;font-size:15px}
+  header{gap:.5rem;padding:0 .85rem}
 }
 </style>
 </head>
@@ -600,9 +613,9 @@ textarea{resize:vertical;min-height:100px;grid-column:1/-1}
     </div>
   </div>
   <div class="tabs">
-    <button class="tab-btn active" onclick="switchTab('cam',this)">📷 Caméra</button>
-    <button class="tab-btn"        onclick="switchTab('talk',this)">💬 Dialogue</button>
-    <button class="tab-btn"        onclick="switchTab('text',this)">📝 Texte</button>
+    <button class="tab-btn active" onclick="switchTab('cam',this)">📷<span class="tlab"> Caméra</span></button>
+    <button class="tab-btn"        onclick="switchTab('talk',this)">💬<span class="tlab"> Dialogue</span></button>
+    <button class="tab-btn"        onclick="switchTab('text',this)">📝<span class="tlab"> Texte</span></button>
   </div>
   <div class="mp-pill loading" id="mpPill">⏳ …</div>
 </header>
@@ -981,7 +994,7 @@ document.addEventListener('DOMContentLoaded', function() {
   appLog('info', 'Plateforme: ' + (ios ? 'iOS' : android ? 'Android' : 'Desktop') + ' | RAM: ' + (navigator.deviceMemory || '?') + ' GB');
   _loadLearnedSigns();
   buildRefGrid();
-  _bgPreload(); // Start loading MediaPipe immediately in the background
+  _bgPreload().catch(function() {}); // Précharge MediaPipe en arrière-plan (rejet géré au clic)
   // Dialogue bidirectionnel
   _loadStatus();
   _loadConv();
@@ -1087,7 +1100,7 @@ function deleteLearnedSign(key) {
 var _capturedFingers = null;
 
 /* ── MEDIAPIPE LOADER ─────────────────────────────────── */
-var _mpLoaded = false, _useLocal = false;
+var _mpLoaded = false, _useLocal = true, _mpPromise = null;
 
 function _loadScript(src) {
   return new Promise(function(resolve, reject) {
@@ -1120,50 +1133,45 @@ async function _waitServerReady(maxSec) {
   return false;
 }
 
-// Starts at page load — loads hands.js while the user reads the UI.
-// By the time the user clicks Start, MediaPipe is already loaded.
-async function _bgPreload() {
-  try {
+// Single-flight loader — utilise TOUJOURS les fichiers auto-hébergés (patchés
+// côté serveur). Le CDN unpkg n'est JAMAIS utilisé en repli : ses fichiers WASM
+// ne sont pas patchables et plantent avec « Module.arguments has been replaced ».
+// Mieux vaut attendre le serveur (patché, sûr) que charger un build qui va
+// systématiquement s'abandonner.
+function _bgPreload() {
+  if (_mpPromise) return _mpPromise;
+  _mpPromise = (async function() {
     appLog('info', '── Pré-chargement MediaPipe Hands v0.4.1646424915 (arrière-plan) ──');
-    // Server now downloads all files in parallel (~30-45s cold start).
-    // We wait up to 45s before falling back to CDN.
-    var ok = await _waitServerReady(45);
-    if (ok) {
-      await _loadScript('/mp/hands.js');
-      await _loadScript('/mp/drawing_utils.js');
-      _useLocal = true;
-    } else {
-      await _loadScript('https://unpkg.com/@mediapipe/hands@0.4.1646424915/hands.js');
-      await _loadScript('https://unpkg.com/@mediapipe/drawing_utils@0.3.1620248257/drawing_utils.js');
-      _useLocal = false;
+    var ok = await _waitServerReady(180);   // démarrage à froid Render : jusqu'à 3 min
+    if (!ok) {
+      var pill = document.getElementById('mpPill');
+      if (pill) { pill.className = 'mp-pill error'; pill.textContent = '⏳ IA en préparation'; }
+      appLog('warn', 'IA pas encore prête — le serveur télécharge les fichiers. Cliquez Démarrer pour réessayer.');
+      _mpPromise = null;   // autorise une nouvelle tentative au prochain clic
+      throw new Error('server-not-ready');
     }
+    await _loadScript('/mp/hands.js');
+    await _loadScript('/mp/drawing_utils.js');
+    _useLocal = true;
     _mpLoaded = true;
     var pill = document.getElementById('mpPill');
-    if (pill) {
-      pill.className = 'mp-pill ready';
-      pill.textContent = _useLocal ? '✓ IA prête' : '✓ IA prête (CDN)';
-    }
-    appLog('ok', 'MediaPipe prêt — ' + (_useLocal ? 'local (WASM patché ✓)' : 'CDN fallback') + ' — cliquez Démarrer !');
-  } catch(e) {
-    appLog('err', 'Pré-chargement MediaPipe échoué: ' + e.message);
-    var pill = document.getElementById('mpPill');
-    if (pill) { pill.className = 'mp-pill error'; pill.textContent = '✗ Erreur IA'; }
-  }
+    if (pill) { pill.className = 'mp-pill ready'; pill.textContent = '✓ IA prête'; }
+    appLog('ok', 'MediaPipe prêt — local (WASM patché ✓) — cliquez Démarrer !');
+  })();
+  return _mpPromise;
 }
 
-// Called by startCam() — instant if _bgPreload() already finished.
+// Appelé par startCam() — instantané si _bgPreload() a déjà fini ; sinon attend
+// (et réessaie) les fichiers auto-hébergés. Ne charge jamais le CDN.
 async function ensureMP() {
   if (_mpLoaded) return;
-  var waited = 0;
-  while (!_mpLoaded && waited < 90) {
-    document.getElementById('liveConf').textContent = 'Chargement MediaPipe… ' + waited + 's';
-    await new Promise(function(r) { setTimeout(r, 1000); });
-    waited++;
-  }
-  if (!_mpLoaded) {
-    var pill = document.getElementById('mpPill');
-    if (pill) { pill.className = 'mp-pill error'; pill.textContent = '✗ Erreur IA'; }
-    throw new Error('MediaPipe non chargé après 90s — rechargez la page');
+  var lc = document.getElementById('liveConf');
+  if (lc) lc.textContent = 'Préparation de l\'IA… (téléchargement serveur)';
+  try {
+    await _bgPreload();
+  } catch(e) {
+    if (lc) lc.textContent = '';
+    throw new Error('IA pas encore prête — patientez quelques secondes puis réessayez');
   }
 }
 
@@ -2203,13 +2211,20 @@ function clearText() {
 }
 
 /* ── PWA : service worker ────────────────────────────────── */
+// Enregistré après l'événement 'load' : pendant le démarrage à froid de Render,
+// la requête /sw.js peut être avortée. On attend donc que la page soit stable,
+// et un échec reste silencieux (fonctionnalité non critique).
 function _registerSW() {
   if (!('serviceWorker' in navigator)) return;
-  navigator.serviceWorker.register('/sw.js').then(function() {
-    appLog('ok', '📲 PWA prête (installable / cache hors-ligne)');
-  }).catch(function(e) {
-    appLog('warn', 'Service worker non enregistré : ' + e.message);
-  });
+  function reg() {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(function() {
+      appLog('ok', '📲 PWA prête (installable / cache hors-ligne)');
+    }).catch(function(e) {
+      appLog('info', 'PWA : service worker non enregistré (' + (e && e.message ? e.message : 'ignoré') + ')');
+    });
+  }
+  if (document.readyState === 'complete') reg();
+  else window.addEventListener('load', reg);
 }
 
 document.addEventListener('DOMContentLoaded', function() {

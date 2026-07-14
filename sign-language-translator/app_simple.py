@@ -35,7 +35,7 @@ def _fetch_bytes(url):
     with urlopen(req, timeout=90) as r:
         return r.read()
 
-_PATCH_VER = '5'  # bump whenever patching logic changes to force cache invalidation
+_PATCH_VER = '6'  # bump whenever patching logic changes to force cache invalidation
 
 # Emscripten installs an ABORTING getter on Module.arguments (and other legacy
 # props) via legacyModuleProp(prop, newName). On modern Chrome the runtime reads
@@ -52,6 +52,11 @@ _PATCH_STRATEGIES = [
     # 3. Install the aborting getter on a throwaway object instead of on Module.
     (re.compile(r'Object\.defineProperty\(\s*Module\s*,\s*prop\s*,'),
      'Object.defineProperty({},prop,'),
+    # 4. packed_assets_loader.js: on modern Chrome, Module.dataFileDownloads can
+    #    be undefined in the progress callback's else-branch, throwing on every
+    #    onprogress event and flooding the console. Guard the read.
+    (re.compile(r'Module\.dataFileDownloads\[url\]\.loaded\s*=\s*event\.loaded;'),
+     'if(Module.dataFileDownloads&&Module.dataFileDownloads[url])Module.dataFileDownloads[url].loaded=event.loaded;'),
 ]
 
 def _record_patch(fname, total):
@@ -81,10 +86,10 @@ def _patch_mp(fname, raw):
         if n:
             total += n
             print(f'[MP] {fname}: patched {n}x [{pat.pattern[:38]}]')
-    if 'legacyModuleProp' in text:
+    if total > 0:
         _record_patch(fname, total)
-        if total == 0:
-            print(f'[MP] WARNING {fname}: legacyModuleProp present but no strategy matched')
+    if 'legacyModuleProp' in text and total == 0:
+        print(f'[MP] WARNING {fname}: legacyModuleProp present but no strategy matched')
     return text.encode('utf-8')
 
 _dl_lock = threading.Lock()

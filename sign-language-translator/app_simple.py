@@ -3,7 +3,7 @@ from flask import Flask, request, jsonify, render_template_string, Response
 from flask_cors import CORS
 import os, re, time, threading
 from concurrent.futures import ThreadPoolExecutor
-from urllib.request import urlopen
+from urllib.request import urlopen, Request
 from pathlib import Path
 
 app = Flask(__name__)
@@ -23,7 +23,17 @@ _MP_FILES = [
     (f'https://unpkg.com/@mediapipe/hands@{_MP_VER}/hands_solution_wasm_bin.wasm',          'hands_solution_wasm_bin.wasm'),
     (f'https://unpkg.com/@mediapipe/drawing_utils@{_DU_VER}/drawing_utils.js',              'drawing_utils.js'),
 ]
-_mp_status = {'ready': False, 'done': 0, 'total': len(_MP_FILES)}
+_mp_status = {'ready': False, 'done': 0, 'total': len(_MP_FILES), 'error': ''}
+
+# unpkg (Cloudflare) renvoie 403 aux User-Agent non-navigateur → on se fait
+# passer pour un navigateur. jsDelivr sert de miroir si unpkg échoue.
+_UA = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+       '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+
+def _fetch_bytes(url):
+    req = Request(url, headers={'User-Agent': _UA, 'Accept': '*/*'})
+    with urlopen(req, timeout=90) as r:
+        return r.read()
 
 _ASSERT_PAT = re.compile(
     r'Object\.getOwnPropertyDescriptor\(Module,\s*["\'\`]arguments["\'\`]\)'
@@ -51,26 +61,33 @@ def _patch_mp(fname, raw):
 _dl_lock = threading.Lock()
 
 def _dl_one(url_fname):
-    """Download and patch one MediaPipe file; returns True on success."""
+    """Download and patch one MediaPipe file; returns True on success.
+    Tries unpkg then the jsDelivr mirror, each with a browser User-Agent."""
     url, fname = url_fname
     dest = _MP_DIR / fname
     if dest.exists() and dest.stat().st_size > 100:
         with _dl_lock:
             _mp_status['done'] += 1
         return True
+    alts = [url, url.replace('https://unpkg.com/', 'https://cdn.jsdelivr.net/npm/')]
+    last_err = ''
     for attempt in range(3):
-        try:
-            with urlopen(url, timeout=90) as r:
-                data = _patch_mp(fname, r.read())
-            dest.write_bytes(data)
-            with _dl_lock:
-                _mp_status['done'] += 1
-            print(f'[MP] ✓ {fname} ({len(data)//1024} KB)')
-            return True
-        except Exception as e:
-            print(f'[MP] download failed {fname} attempt {attempt+1}: {e}')
-            if attempt < 2:
-                time.sleep(2 ** attempt)
+        for u in alts:
+            host = u.split('/')[2]
+            try:
+                data = _patch_mp(fname, _fetch_bytes(u))
+                dest.write_bytes(data)
+                with _dl_lock:
+                    _mp_status['done'] += 1
+                print(f'[MP] ✓ {fname} ({len(data)//1024} KB) via {host}')
+                return True
+            except Exception as e:
+                last_err = f'{fname} <{host}>: {e}'
+                print(f'[MP] fail {last_err} (try {attempt+1})')
+        if attempt < 2:
+            time.sleep(2 ** attempt)
+    with _dl_lock:
+        _mp_status['error'] = last_err
     return False
 
 def _download_mp():
@@ -1129,7 +1146,13 @@ async function _waitServerReady(maxSec) {
     } catch(e) {}
     await new Promise(function(r) { setTimeout(r, 2000); });
   }
-  appLog('warn', 'Serveur non prêt après ' + maxSec + 's — chargement depuis CDN unpkg…');
+  try {
+    var st = await fetch('/mp_status').then(function(r) { return r.json(); });
+    appLog('warn', 'Serveur IA pas prêt après ' + maxSec + 's — ' + st.done + '/' + st.total
+      + ' fichiers' + (st.error ? ' — dernière erreur: ' + st.error : ''));
+  } catch(e) {
+    appLog('warn', 'Serveur IA pas prêt après ' + maxSec + 's (statut injoignable)');
+  }
   return false;
 }
 

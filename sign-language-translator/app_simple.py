@@ -228,7 +228,11 @@ HTML = r"""<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SignVoix">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#4f46e5">
+<link rel="manifest" href="/manifest.json">
 <title>SignVoix — Traducteur LSF</title>
 <style>
 :root{
@@ -516,6 +520,61 @@ textarea{resize:vertical;min-height:100px;grid-column:1/-1}
 /* ── SIDE STACK ── */
 .side-stack{display:flex;flex-direction:column;gap:1rem}
 
+/* ── DIALOGUE (bidirectionnel) ── */
+.talk-wrap{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:1rem}
+.status-bar{display:flex;align-items:center;gap:.6rem;background:var(--card);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--sh);padding:.7rem .9rem}
+.status-chip{flex:1;display:flex;flex-direction:column;gap:2px;cursor:pointer;padding:.35rem .5rem;border-radius:9px;transition:background .15s}
+.status-chip:hover{background:#f1f5f9}
+.sc-label{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.sc-val{font-size:14px;font-weight:800;color:var(--brand);display:flex;align-items:center;gap:.35rem}
+.status-swap{font-size:18px;color:#cbd5e1;flex-shrink:0}
+.btn-status-edit{flex-shrink:0;width:34px;height:34px;border:1px solid var(--border);border-radius:9px;background:var(--card);cursor:pointer;font-size:15px;color:var(--muted);transition:all .15s}
+.btn-status-edit:hover{background:#e0e7ff;color:var(--brand)}
+.mode-hint{font-size:11px;color:var(--muted);text-align:center;padding:.2rem;line-height:1.5}
+.mode-hint strong{color:var(--brand)}
+
+.listen-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--sh);padding:1rem;display:flex;flex-direction:column;gap:.85rem;align-items:center}
+.listen-live{width:100%;min-height:64px;background:#f8fafc;border:1.5px dashed var(--border);border-radius:10px;padding:.8rem 1rem;font-size:18px;line-height:1.45;color:var(--text);text-align:center;display:flex;align-items:center;justify-content:center}
+.listen-live.listening{border-color:var(--brand);border-style:solid;background:#eef2ff}
+.listen-live .interim{color:var(--muted);font-style:italic}
+.mic-btn{display:flex;align-items:center;gap:.55rem;padding:.85rem 1.7rem;border:none;border-radius:999px;background:linear-gradient(135deg,var(--brand),var(--accent));color:#fff;font-size:16px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(79,70,229,.3);transition:all .18s;min-height:52px}
+.mic-btn:hover{filter:brightness(1.07);transform:translateY(-1px)}
+.mic-btn.active{background:linear-gradient(135deg,var(--red),#b91c1c);box-shadow:0 4px 16px rgba(220,38,38,.35);animation:_pulse 1.3s ease-in-out infinite}
+@keyframes _pulse{0%,100%{box-shadow:0 4px 16px rgba(220,38,38,.35)}50%{box-shadow:0 4px 26px rgba(220,38,38,.6)}}
+.mic-btn:disabled{opacity:.55;cursor:not-allowed;filter:grayscale(.5)}
+.listen-manual{width:100%;display:flex;gap:.5rem}
+.listen-manual input{flex:1;padding:.6rem .75rem;border:1px solid var(--border);border-radius:9px;font-size:14px}
+.listen-manual button{padding:.6rem 1rem;border:none;border-radius:9px;background:var(--brand);color:#fff;font-weight:700;cursor:pointer;font-size:13px}
+
+.conv-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;display:flex;flex-direction:column}
+.conv-hdr{display:flex;align-items:center;justify-content:space-between;padding:.7rem 1rem;background:#f8fafc;border-bottom:1px solid var(--border);font-size:12px;font-weight:800;color:var(--muted)}
+.conv-hdr button{border:1px solid var(--border);background:var(--card);border-radius:7px;padding:.25rem .55rem;cursor:pointer;font-size:12px;color:var(--muted)}
+.conv-hdr button:hover{background:#fee2e2;color:var(--red)}
+.conv-body{max-height:340px;overflow-y:auto;padding:.85rem;display:flex;flex-direction:column;gap:.6rem}
+.conv-empty{text-align:center;color:#cbd5e1;font-size:13px;padding:2rem 1rem}
+.bubble{max-width:82%;padding:.6rem .85rem;border-radius:13px;font-size:15px;line-height:1.4;position:relative;word-break:break-word}
+.bubble .bmeta{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;opacity:.7;margin-bottom:3px;display:flex;align-items:center;gap:.3rem}
+.bubble.me{align-self:flex-end;background:linear-gradient(135deg,var(--brand),var(--accent));color:#fff;border-bottom-right-radius:4px}
+.bubble.other{align-self:flex-start;background:#f1f5f9;color:var(--text);border-bottom-left-radius:4px}
+.bubble .breplay{margin-left:.4rem;cursor:pointer;opacity:.75}
+.bubble .breplay:hover{opacity:1}
+
+/* ── MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.55);backdrop-filter:blur(3px);z-index:200;display:flex;align-items:center;justify-content:center;padding:1.25rem}
+.modal-card{background:var(--card);border-radius:16px;box-shadow:var(--sh2);padding:1.5rem;max-width:440px;width:100%;max-height:90vh;overflow-y:auto}
+.modal-card h3{font-size:17px;font-weight:800;color:var(--text);margin-bottom:.4rem}
+.modal-card .mc-sub{font-size:12px;color:var(--muted);margin-bottom:1.1rem;line-height:1.5}
+.status-group{margin-bottom:1.1rem}
+.status-group>label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);display:block;margin-bottom:.5rem}
+.status-opts{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+.status-opt{display:flex;flex-direction:column;align-items:center;gap:.25rem;padding:.7rem .5rem;border:2px solid var(--border);border-radius:11px;cursor:pointer;transition:all .15s;text-align:center;background:var(--card)}
+.status-opt:hover{border-color:#c7d2fe;background:#f8fafc}
+.status-opt.sel{border-color:var(--brand);background:#eef2ff}
+.status-opt .so-icon{font-size:22px;line-height:1}
+.status-opt .so-name{font-size:13px;font-weight:800;color:var(--text)}
+.status-opt .so-desc{font-size:9.5px;color:var(--muted);line-height:1.3}
+.modal-card .btn-primary{width:100%;margin-top:.3rem}
+
 /* ── RESPONSIVE ── */
 @media(max-width:720px){
   :root{--hh:54px}
@@ -542,6 +601,7 @@ textarea{resize:vertical;min-height:100px;grid-column:1/-1}
   </div>
   <div class="tabs">
     <button class="tab-btn active" onclick="switchTab('cam',this)">📷 Caméra</button>
+    <button class="tab-btn"        onclick="switchTab('talk',this)">💬 Dialogue</button>
     <button class="tab-btn"        onclick="switchTab('text',this)">📝 Texte</button>
   </div>
   <div class="mp-pill loading" id="mpPill">⏳ …</div>
@@ -666,6 +726,51 @@ textarea{resize:vertical;min-height:100px;grid-column:1/-1}
   </div>
 </div>
 
+<!-- ══ DIALOGUE PANE (bidirectionnel) ════════════════════════ -->
+<div id="pane-talk" class="pane">
+  <div class="talk-wrap">
+
+    <!-- Statuts des interlocuteurs -->
+    <div class="status-bar" id="statusBar">
+      <div class="status-chip" onclick="openStatusModal()">
+        <span class="sc-label">Moi</span>
+        <span class="sc-val" id="scMe">👂 Entendant</span>
+      </div>
+      <span class="status-swap">⇄</span>
+      <div class="status-chip" onclick="openStatusModal()">
+        <span class="sc-label">L'autre personne</span>
+        <span class="sc-val" id="scOther">👂 Entendant</span>
+      </div>
+      <button class="btn-status-edit" onclick="openStatusModal()" title="Changer les statuts">⚙</button>
+    </div>
+    <div class="mode-hint" id="modeHint"></div>
+
+    <!-- Reconnaissance vocale : la personne entendante parle → texte -->
+    <div class="listen-card" id="listenCard">
+      <div class="listen-live" id="listenLive">Appuyez sur le micro puis parlez — le texte s'affichera ici.</div>
+      <button class="mic-btn" id="micBtn" onclick="toggleListen()">
+        <span id="micIcon">🎙️</span><span id="micLabel">Écouter</span>
+      </button>
+      <div class="listen-manual" id="listenManual" style="display:none">
+        <input id="manualText" type="text" placeholder="Ou tapez le message ici…" onkeydown="if(event.key==='Enter')sendManual()">
+        <button onclick="sendManual()">Envoyer</button>
+      </div>
+    </div>
+
+    <!-- Historique de conversation -->
+    <div class="conv-card">
+      <div class="conv-hdr">
+        <span>💬 Conversation</span>
+        <button onclick="clearConversation()" title="Effacer la conversation">🗑 Effacer</button>
+      </div>
+      <div class="conv-body" id="convBody">
+        <div class="conv-empty" id="convEmpty">La conversation apparaîtra ici — signes reconnus et paroles transcrites.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
 <!-- ══ TEXT PANE ════════════════════════════════════════════ -->
 <div id="pane-text" class="pane">
   <div class="card text-card">
@@ -714,6 +819,23 @@ textarea{resize:vertical;min-height:100px;grid-column:1/-1}
 
 </main>
 
+<!-- ══ STATUS MODAL ═════════════════════════════════════════ -->
+<div class="modal-overlay" id="statusModal" style="display:none">
+  <div class="modal-card">
+    <h3>👥 Qui communique ?</h3>
+    <p class="mc-sub">Choisissez votre situation et celle de la personne en face. L'interface s'adaptera automatiquement.</p>
+    <div class="status-group">
+      <label>Je suis…</label>
+      <div class="status-opts" id="meOpts"></div>
+    </div>
+    <div class="status-group">
+      <label>L'autre personne est…</label>
+      <div class="status-opts" id="otherOpts"></div>
+    </div>
+    <button class="btn btn-primary" onclick="saveStatus()">✓ Valider</button>
+  </div>
+</div>
+
 <!-- ══ LOG PANEL ════════════════════════════════════════════ -->
 <div style="max-width:1080px;margin:0 auto;padding:0 1.25rem 1.5rem">
   <div class="log-panel">
@@ -736,6 +858,10 @@ function switchTab(name, btn) {
   document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
   document.getElementById('pane-' + name).classList.add('active');
   btn.classList.add('active');
+  // Première ouverture du Dialogue sans statut configuré → propose la config
+  if (name === 'talk' && !localStorage.getItem('lsf_status')) {
+    setTimeout(openStatusModal, 250);
+  }
 }
 
 /* ── LOG SYSTEM ────────────────────────────────────────── */
@@ -856,6 +982,13 @@ document.addEventListener('DOMContentLoaded', function() {
   _loadLearnedSigns();
   buildRefGrid();
   _bgPreload(); // Start loading MediaPipe immediately in the background
+  // Dialogue bidirectionnel
+  _loadStatus();
+  _loadConv();
+  _applyStatusUI();
+  _renderConvAll();
+  _initSR();
+  _registerSW();
 });
 
 /* ── LEARNING SERVICE ────────────────────────────────── */
@@ -1688,6 +1821,7 @@ function _addWord(sign) {
     var txt = exact ? exact.fr : sentence.join(', ');
     appLog('info', '⏱ Lecture auto : «' + txt + '»');
     speakFR(txt);
+    addConv('me', 'sign', txt);
   }, 3000);
 }
 
@@ -1757,6 +1891,241 @@ function speakSentence() {
   var txt = exact ? exact.fr : sentence.join(', ');
   appLog('info', '🔊 Lecture : «' + txt + '»' + (exact ? ' (phrase naturelle)' : ''));
   speakFR(txt);
+  addConv('me', 'sign', txt);
+}
+
+/* ══ DIALOGUE BIDIRECTIONNEL ═══════════════════════════════
+   Statuts + reconnaissance vocale (parole→texte) + historique */
+
+var STATUSES = [
+  { key:'deaf-mute', icon:'🤟', name:'Sourd-Muet', desc:'Signe (LSF)',           canHear:false, canSpeak:false },
+  { key:'deaf',      icon:'🧏', name:'Sourd',      desc:'Parle, n\'entend pas',  canHear:false, canSpeak:true  },
+  { key:'mute',      icon:'🤫', name:'Muet',       desc:'Entend, ne parle pas',  canHear:true,  canSpeak:false },
+  { key:'normal',    icon:'👂', name:'Entendant',  desc:'Entend et parle',       canHear:true,  canSpeak:true  }
+];
+function _statusByKey(k) {
+  for (var i=0;i<STATUSES.length;i++){ if (STATUSES[i].key===k) return STATUSES[i]; }
+  return STATUSES[3];
+}
+
+var userStatus = 'deaf-mute', otherStatus = 'normal';
+var _pendingMe = null, _pendingOther = null;
+
+function _loadStatus() {
+  try {
+    var raw = localStorage.getItem('lsf_status');
+    if (raw) { var o = JSON.parse(raw); userStatus = o.me || userStatus; otherStatus = o.other || otherStatus; }
+  } catch(e) {}
+}
+function _saveStatusLS() {
+  try { localStorage.setItem('lsf_status', JSON.stringify({ me:userStatus, other:otherStatus })); } catch(e) {}
+}
+
+function _renderStatusBar() {
+  var me = _statusByKey(userStatus), ot = _statusByKey(otherStatus);
+  var em = document.getElementById('scMe'), eo = document.getElementById('scOther');
+  if (em) em.textContent = me.icon + ' ' + me.name;
+  if (eo) eo.textContent = ot.icon + ' ' + ot.name;
+  var hint = document.getElementById('modeHint');
+  if (hint) {
+    var parts = [];
+    if (!me.canSpeak) parts.push('Vous signez → l\'app <strong>parle</strong> pour vous');
+    if (!me.canHear)  parts.push('L\'autre parle → l\'app <strong>écrit</strong> pour vous');
+    hint.innerHTML = parts.length ? parts.join(' · ') : 'Communication libre dans les deux sens';
+  }
+}
+
+function _applyStatusUI() {
+  var me = _statusByKey(userStatus), ot = _statusByKey(otherStatus);
+  // Le micro (parole→texte) sert quand l'autre PEUT parler (sinon rien à écouter)
+  var listenCard = document.getElementById('listenCard');
+  if (listenCard) listenCard.style.opacity = ot.canSpeak ? '1' : '.55';
+  // Bouton "Apprendre ce signe" déjà géré ailleurs ; ici on n'enlève rien.
+  _renderStatusBar();
+}
+
+function openStatusModal() {
+  _pendingMe = userStatus; _pendingOther = otherStatus;
+  _buildStatusOpts('meOpts', 'me');
+  _buildStatusOpts('otherOpts', 'other');
+  document.getElementById('statusModal').style.display = 'flex';
+}
+
+function _buildStatusOpts(containerId, which) {
+  var c = document.getElementById(containerId);
+  if (!c) return;
+  c.innerHTML = '';
+  var cur = which === 'me' ? _pendingMe : _pendingOther;
+  STATUSES.forEach(function(s) {
+    var d = document.createElement('div');
+    d.className = 'status-opt' + (s.key === cur ? ' sel' : '');
+    d.innerHTML = '<span class="so-icon">' + s.icon + '</span>'
+      + '<span class="so-name">' + s.name + '</span>'
+      + '<span class="so-desc">' + s.desc + '</span>';
+    d.onclick = function() {
+      if (which === 'me') _pendingMe = s.key; else _pendingOther = s.key;
+      _buildStatusOpts(containerId, which);
+    };
+    c.appendChild(d);
+  });
+}
+
+function saveStatus() {
+  userStatus = _pendingMe || userStatus;
+  otherStatus = _pendingOther || otherStatus;
+  _saveStatusLS();
+  document.getElementById('statusModal').style.display = 'none';
+  _applyStatusUI();
+  appLog('info', 'Statuts : moi=' + userStatus + ', autre=' + otherStatus);
+}
+
+/* ── RECONNAISSANCE VOCALE (Web Speech API) ──────────────── */
+var _SR = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+var _rec = null, _listening = false;
+
+function _initSR() {
+  if (!_SR) {
+    appLog('warn', 'SpeechRecognition non supportée — saisie manuelle activée');
+    var mb = document.getElementById('micBtn');
+    if (mb) { mb.disabled = true; document.getElementById('micLabel').textContent = 'Micro indisponible'; }
+    var lm = document.getElementById('listenManual');
+    if (lm) lm.style.display = 'flex';
+    return;
+  }
+  _rec = new _SR();
+  _rec.lang = 'fr-FR';
+  _rec.continuous = true;
+  _rec.interimResults = true;
+  _rec.onresult = function(ev) {
+    var interim = '', finalTxt = '';
+    for (var i = ev.resultIndex; i < ev.results.length; i++) {
+      var tr = ev.results[i][0].transcript;
+      if (ev.results[i].isFinal) finalTxt += tr; else interim += tr;
+    }
+    var live = document.getElementById('listenLive');
+    if (finalTxt.trim()) {
+      addConv('other', 'speech', finalTxt.trim());
+      if (live) live.innerHTML = '<span class="interim">…</span>';
+    } else if (live) {
+      live.innerHTML = '<span class="interim">' + (interim || '…') + '</span>';
+    }
+  };
+  _rec.onerror = function(ev) {
+    appLog('warn', 'Reconnaissance vocale : ' + ev.error);
+    if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
+      _stopListen();
+      var lm = document.getElementById('listenManual');
+      if (lm) lm.style.display = 'flex';
+    }
+  };
+  _rec.onend = function() {
+    // Redémarre si l'utilisateur veut toujours écouter (continuous coupe parfois)
+    if (_listening) { try { _rec.start(); } catch(e) { _setMicUI(false); _listening = false; } }
+  };
+}
+
+function toggleListen() {
+  if (!_SR) { sendManual(); return; }
+  if (_listening) _stopListen(); else _startListen();
+}
+function _startListen() {
+  if (!_rec) _initSR();
+  if (!_rec) return;
+  try {
+    _rec.start();
+    _listening = true;
+    _setMicUI(true);
+    var live = document.getElementById('listenLive');
+    if (live) { live.classList.add('listening'); live.innerHTML = '<span class="interim">🎧 À l\'écoute…</span>'; }
+    appLog('info', '🎙️ Écoute démarrée');
+  } catch(e) { appLog('warn', 'Impossible de démarrer l\'écoute : ' + e.message); }
+}
+function _stopListen() {
+  _listening = false;
+  if (_rec) { try { _rec.stop(); } catch(e) {} }
+  _setMicUI(false);
+  var live = document.getElementById('listenLive');
+  if (live) { live.classList.remove('listening'); live.textContent = 'Appuyez sur le micro puis parlez.'; }
+  appLog('info', '🎙️ Écoute arrêtée');
+}
+function _setMicUI(on) {
+  var b = document.getElementById('micBtn');
+  if (!b) return;
+  b.classList.toggle('active', on);
+  document.getElementById('micIcon').textContent = on ? '⏹' : '🎙️';
+  document.getElementById('micLabel').textContent = on ? 'Arrêter' : 'Écouter';
+}
+function sendManual() {
+  var inp = document.getElementById('manualText');
+  if (!inp) return;
+  var t = inp.value.trim();
+  if (!t) return;
+  addConv('other', 'speech', t);
+  inp.value = '';
+}
+
+/* ── HISTORIQUE DE CONVERSATION ──────────────────────────── */
+var CONV = [];
+function _loadConv() {
+  try { var raw = localStorage.getItem('lsf_conv'); if (raw) CONV = JSON.parse(raw); } catch(e) { CONV = []; }
+}
+function _saveConv() {
+  try { localStorage.setItem('lsf_conv', JSON.stringify(CONV.slice(-100))); } catch(e) {}
+}
+function addConv(who, kind, text) {
+  if (!text) return;
+  var entry = { t: Date.now(), who: who, kind: kind, text: text };
+  CONV.push(entry);
+  if (CONV.length > 100) CONV.shift();
+  _saveConv();
+  _appendConvBubble(entry);
+  // Si l'autre a parlé et que JE n'entends pas, le texte s'affiche (déjà) ;
+  // si l'autre a parlé et que JE peux entendre, pas besoin. Rien à vocaliser.
+}
+function _fmtTime(ms) {
+  var d = new Date(ms);
+  function p(n){ return (n<10?'0':'')+n; }
+  return p(d.getHours()) + ':' + p(d.getMinutes());
+}
+function _appendConvBubble(e) {
+  var body = document.getElementById('convBody');
+  if (!body) return;
+  var empty = document.getElementById('convEmpty');
+  if (empty) empty.remove();
+  var b = document.createElement('div');
+  b.className = 'bubble ' + (e.who === 'me' ? 'me' : 'other');
+  var icon = e.kind === 'sign' ? '🤟' : '🎙️';
+  var label = e.who === 'me' ? 'Moi' : 'L\'autre';
+  var replay = (e.who === 'me')
+    ? ' <span class="breplay" title="Relire" onclick="speakFR(' + _jsQuote(e.text) + ')">🔊</span>'
+    : '';
+  b.innerHTML = '<div class="bmeta">' + icon + ' ' + label + ' · ' + _fmtTime(e.t) + replay + '</div>'
+    + _escapeHtml(e.text);
+  body.appendChild(b);
+  body.scrollTop = body.scrollHeight;
+}
+function _escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, function(c) {
+    return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c];
+  });
+}
+function _jsQuote(s) { return "'" + String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'") + "'"; }
+
+function _renderConvAll() {
+  var body = document.getElementById('convBody');
+  if (!body) return;
+  body.innerHTML = '';
+  if (!CONV.length) {
+    body.innerHTML = '<div class="conv-empty" id="convEmpty">La conversation apparaîtra ici — signes reconnus et paroles transcrites.</div>';
+    return;
+  }
+  CONV.forEach(_appendConvBubble);
+}
+function clearConversation() {
+  CONV = [];
+  _saveConv();
+  _renderConvAll();
+  appLog('info', 'Conversation effacée');
 }
 
 /* ── TEXT → GLOSSES ───────────────────────────────────── */
@@ -1833,6 +2202,16 @@ function clearText() {
   document.getElementById('textResult').style.display = 'none';
 }
 
+/* ── PWA : service worker ────────────────────────────────── */
+function _registerSW() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('/sw.js').then(function() {
+    appLog('ok', '📲 PWA prête (installable / cache hors-ligne)');
+  }).catch(function(e) {
+    appLog('warn', 'Service worker non enregistré : ' + e.message);
+  });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('inputText').addEventListener('keydown', function(e) {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) doTranslate();
@@ -1845,6 +2224,70 @@ document.addEventListener('DOMContentLoaded', function() {
 @app.route('/')
 def index():
     return render_template_string(HTML)
+
+# ── PWA : manifest + service worker (installable / cache hors-ligne) ──
+_MANIFEST = {
+    "name": "SignVoix — Traducteur LSF",
+    "short_name": "SignVoix",
+    "description": "Communication LSF bidirectionnelle en temps réel",
+    "start_url": "/",
+    "display": "standalone",
+    "orientation": "any",
+    "background_color": "#f1f5f9",
+    "theme_color": "#4f46e5",
+    "lang": "fr",
+    "icons": [
+        {"src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"}
+    ],
+}
+
+@app.route('/manifest.json')
+def manifest():
+    return jsonify(_MANIFEST)
+
+_ICON_SVG = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">'
+    '<rect width="512" height="512" rx="112" fill="#4f46e5"/>'
+    '<text x="50%" y="52%" font-size="300" text-anchor="middle" '
+    'dominant-baseline="central">\U0001F91F</text></svg>'
+)
+
+@app.route('/icon.svg')
+def icon_svg():
+    return Response(_ICON_SVG, mimetype='image/svg+xml')
+
+# Service worker : network-first pour tout, avec repli sur le cache hors-ligne.
+_SW_JS = """
+const CACHE = 'signvoix-v1';
+const SHELL = ['/', '/manifest.json', '/icon.svg'];
+self.addEventListener('install', (e) => {
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+});
+self.addEventListener('activate', (e) => {
+  e.waitUntil(caches.keys().then((keys) =>
+    Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
+  ).then(() => self.clients.claim()));
+});
+self.addEventListener('fetch', (e) => {
+  const req = e.request;
+  if (req.method !== 'GET') return;
+  // Ne pas mettre l'API en cache
+  if (req.url.indexOf('/api/') !== -1) return;
+  e.respondWith(
+    fetch(req).then((res) => {
+      if (res && res.status === 200 && res.type === 'basic') {
+        const copy = res.clone();
+        caches.open(CACHE).then((c) => c.put(req, copy));
+      }
+      return res;
+    }).catch(() => caches.match(req).then((m) => m || caches.match('/')))
+  );
+});
+"""
+
+@app.route('/sw.js')
+def service_worker():
+    return Response(_SW_JS, mimetype='application/javascript')
 
 @app.route('/api/translate', methods=['POST'])
 def translate():

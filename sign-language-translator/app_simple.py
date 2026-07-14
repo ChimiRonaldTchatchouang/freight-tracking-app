@@ -1634,6 +1634,7 @@ function _addPredSign(key) {
 window.Module = window.Module || {};
 
 var mpH = null, rafId = null, stream = null, running = false;
+var _gotResult = false, _sendCount = 0, _resultCount = 0;
 var holdKey = null, holdStart = 0, cooldownUntil = 0;
 var sentence = [], _sentenceObjs = [], debugOn = false;
 var _errCount = 0;
@@ -1772,6 +1773,11 @@ async function startCam() {
   appLog('info', 'Modèle: maxMains=2 (bimanuel activé), complexité=0, détection≥55%, suivi≥40%');
 
   mpH.onResults(function(res) {
+    _resultCount++;
+    if (!_gotResult) {
+      _gotResult = true;
+      appLog('ok', '✓ Modèle actif — 1re réponse reçue (le graphe MediaPipe tourne)');
+    }
     ctx.clearRect(0, 0, cvs.width, cvs.height);
     var lms = res.multiHandLandmarks;
     var handCount = lms ? lms.length : 0;
@@ -1823,7 +1829,7 @@ async function startCam() {
   });
 
   appLog('ok', '── Détection démarrée (20 fps) — ' + SIGNS.length + ' signes unimanuel + ' + BIMANUAL_SIGNS.length + ' signes bimanuel ──');
-  running = true; _errCount = 0;
+  running = true; _errCount = 0; _gotResult = false; _sendCount = 0; _resultCount = 0;
   var lastTs = 0;
   var FRAME_MS = 1000 / 20;
 
@@ -1833,7 +1839,13 @@ async function startCam() {
     if (ts - lastTs >= FRAME_MS && vid.readyState >= 2) {
       lastTs = ts;
       try {
-        mpH.send({ image: vid });
+        var p = mpH.send({ image: vid });
+        _sendCount++;
+        if (p && typeof p.catch === 'function') {
+          p.catch(function(e) {
+            if (_errCount++ === 0) appLog('err', 'mpH.send() rejet: ' + (e && e.message ? e.message : e));
+          });
+        }
         _errCount = 0;
       } catch(e) {
         _errCount++;
@@ -1847,6 +1859,21 @@ async function startCam() {
   }
   rafId = requestAnimationFrame(loop);
   document.getElementById('liveConf').textContent = '✅ Actif — montrez un signe LSF !';
+
+  // Watchdog : si le modèle ne répond pas, on diagnostique (frames envoyées vs
+  // réponses reçues) au lieu de laisser l'utilisateur devant un écran muet.
+  setTimeout(function() {
+    if (!running) return;
+    if (!_gotResult) {
+      appLog('err', '⚠ Aucune réponse du modèle après 6s — ' + _sendCount
+        + ' frame(s) envoyée(s), 0 reçue(s). Le graphe/modèle ne s\'est pas chargé '
+        + '(readyState vidéo=' + vid.readyState + ').');
+    } else {
+      appLog('info', 'Diagnostic 6s : ' + _sendCount + ' frames envoyées, '
+        + _resultCount + ' réponses — le modèle fonctionne. Montrez bien votre '
+        + 'main entière, paume vers la caméra, bien éclairée.');
+    }
+  }, 6000);
 }
 
 function stopCam() {

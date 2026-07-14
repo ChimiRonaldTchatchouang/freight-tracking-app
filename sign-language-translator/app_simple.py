@@ -35,28 +35,57 @@ def _fetch_bytes(url):
     with urlopen(req, timeout=90) as r:
         return r.read()
 
-_ASSERT_PAT = re.compile(
-    r'Object\.getOwnPropertyDescriptor\(Module,\s*["\'\`]arguments["\'\`]\)'
-)
-_ABORT_ARGS_PAT = re.compile(
-    r'\b\w+\s*\(\s*["\'\`]Module\.arguments has been replaced[^"\'\`]*["\'\`]\s*\)'
-)
-_PATCH_VER = '4'  # bump whenever patching logic changes to force cache invalidation
+_PATCH_VER = '5'  # bump whenever patching logic changes to force cache invalidation
+
+# Emscripten installs an ABORTING getter on Module.arguments (and other legacy
+# props) via legacyModuleProp(prop, newName). On modern Chrome the runtime reads
+# Module.arguments after startup and hits abort("... has been replaced ..."),
+# which kills hands.js. The previous patch looked for a literal 'arguments' but
+# the real code uses the *variable* `prop`, so it never matched. These three
+# independent strategies each key on `prop` — any single match neutralises it:
+_PATCH_STRATEGIES = [
+    # 1. Turn legacyModuleProp into a no-op (covers every legacy prop at once).
+    (re.compile(r'(function\s+legacyModuleProp\s*\([^)]*\)\s*\{)'), r'\1return;'),
+    # 2. Never enter the branch that installs the trap.
+    (re.compile(r'if\s*\(\s*!\s*Object\.getOwnPropertyDescriptor\(\s*Module\s*,\s*prop\s*\)\s*\)'),
+     'if(false)'),
+    # 3. Install the aborting getter on a throwaway object instead of on Module.
+    (re.compile(r'Object\.defineProperty\(\s*Module\s*,\s*prop\s*,'),
+     'Object.defineProperty({},prop,'),
+]
+
+def _record_patch(fname, total):
+    """Persist the patch result so /mp_status can report it to the browser
+    (Render server logs aren't visible from the client)."""
+    try:
+        pf = _MP_DIR / '.patchinfo'
+        prev = pf.read_text() if pf.exists() else ''
+        lines = [l for l in prev.splitlines() if not l.startswith(fname + ':')]
+        lines.append(f'{fname}:{total}')
+        pf.write_text('\n'.join(lines))
+    except Exception:
+        pass
 
 def _patch_mp(fname, raw):
-    """Neutralise two Emscripten checks that conflict with hands.js Module.arguments."""
-    if fname in ('hands_solution_simd_wasm_bin.js', 'hands_solution_wasm_bin.js'):
-        try:
-            text = raw.decode('utf-8')
-            p1 = _ASSERT_PAT.sub('false', text)
-            p2 = _ABORT_ARGS_PAT.sub('(0)', p1)
-            n = (p1 != text) + (p2 != p1)
-            if n:
-                print(f'[MP] patched {n} assertion(s) in {fname}')
-            return p2.encode('utf-8')
-        except Exception as e:
-            print(f'[MP] patch error {fname}: {e}')
-    return raw
+    """Neutralise the Emscripten legacyModuleProp abort trap so hands.js runs on
+    modern Chrome. Applied to every glue .js file (no-op where absent)."""
+    if not fname.endswith('.js'):
+        return raw
+    try:
+        text = raw.decode('utf-8')
+    except Exception:
+        return raw
+    total = 0
+    for pat, repl in _PATCH_STRATEGIES:
+        text, n = pat.subn(repl, text)
+        if n:
+            total += n
+            print(f'[MP] {fname}: patched {n}x [{pat.pattern[:38]}]')
+    if 'legacyModuleProp' in text:
+        _record_patch(fname, total)
+        if total == 0:
+            print(f'[MP] WARNING {fname}: legacyModuleProp present but no strategy matched')
+    return text.encode('utf-8')
 
 _dl_lock = threading.Lock()
 
@@ -115,6 +144,8 @@ def _download_mp_inner():
             old.unlink(missing_ok=True)
         for old in _MP_DIR.glob('*.wasm'):
             old.unlink(missing_ok=True)
+        (_MP_DIR / '.patchinfo').unlink(missing_ok=True)
+        (_MP_DIR / '.error').unlink(missing_ok=True)
         _mp_status['done'] = 0
 
     # Download all files in parallel (4 workers) — cuts cold-start from ~2 min to ~30 s.
@@ -189,11 +220,19 @@ def mp_status_route():
             err = ef.read_text()[:300]
         except Exception:
             err = ''
+    patch = ''
+    pf = _MP_DIR / '.patchinfo'
+    if pf.exists():
+        try:
+            patch = pf.read_text()[:200].replace('\n', ' ')
+        except Exception:
+            patch = ''
     return jsonify({
         'done':  _files_on_disk(),
         'total': len(_MP_FILES),
         'ready': _mp_ready_on_disk(),
         'error': err,
+        'patch': patch,
     })
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -1196,7 +1235,9 @@ async function _waitServerReady(maxSec) {
         pill.textContent = '⏳ ' + st.done + '/' + st.total;
       }
       if (st.ready) {
-        appLog('ok', 'Serveur prêt: ' + st.done + '/' + st.total + ' fichiers MediaPipe (WASM patchés ✓)');
+        appLog('ok', 'Serveur prêt: ' + st.done + '/' + st.total + ' fichiers MediaPipe');
+        appLog(st.patch && st.patch.indexOf(':0') === -1 ? 'ok' : 'warn',
+          'Patch WASM (legacyModuleProp) : ' + (st.patch || 'aucune info'));
         return true;
       }
     } catch(e) {}

@@ -1316,41 +1316,58 @@ async function _waitServerReady(maxSec) {
 // ne sont pas patchables et plantent avec « Module.arguments has been replaced ».
 // Mieux vaut attendre le serveur (patché, sûr) que charger un build qui va
 // systématiquement s'abandonner.
+// Charge MediaPipe Tasks Vision (HandLandmarker moderne) depuis le CDN et crée
+// le détecteur. API maintenue, conçue pour les navigateurs actuels — aucun patch
+// WASM, aucun packed-assets loader, aucune des incompatibilités de l'ancienne
+// API Hands 2022. Single-flight : une seule initialisation partagée.
 function _bgPreload() {
   if (_mpPromise) return _mpPromise;
   _mpPromise = (async function() {
-    appLog('info', '── Pré-chargement MediaPipe Hands v0.4.1646424915 (arrière-plan) ──');
-    var ok = await _waitServerReady(180);   // démarrage à froid Render : jusqu'à 3 min
-    if (!ok) {
-      var pill = document.getElementById('mpPill');
-      if (pill) { pill.className = 'mp-pill error'; pill.textContent = '⏳ IA en préparation'; }
-      appLog('warn', 'IA pas encore prête — le serveur télécharge les fichiers. Cliquez Démarrer pour réessayer.');
-      _mpPromise = null;   // autorise une nouvelle tentative au prochain clic
-      throw new Error('server-not-ready');
-    }
-    await _loadScript('/mp/hands.js');
-    await _loadScript('/mp/drawing_utils.js');
-    _useLocal = true;
-    _mpLoaded = true;
     var pill = document.getElementById('mpPill');
+    if (pill) { pill.className = 'mp-pill loading'; pill.textContent = '⏳ IA…'; }
+    appLog('info', '── Chargement MediaPipe Tasks Vision v' + TV_VER + ' (HandLandmarker) ──');
+    try {
+      _TV = await import(TV_BASE + '/vision_bundle.mjs');
+    } catch(e) {
+      if (pill) { pill.className = 'mp-pill error'; pill.textContent = '✗ IA'; }
+      appLog('err', 'Import tasks-vision échoué : ' + (e && e.message ? e.message : e));
+      _mpPromise = null;
+      throw e;
+    }
+    appLog('info', 'Chargement du runtime WASM + modèle hand_landmarker…');
+    var fileset = await _TV.FilesetResolver.forVisionTasks(TV_BASE + '/wasm');
+    async function _mk(delegate) {
+      return await _TV.HandLandmarker.createFromOptions(fileset, {
+        baseOptions: { modelAssetPath: TV_MODEL, delegate: delegate },
+        runningMode: 'VIDEO',
+        numHands: 2,
+        minHandDetectionConfidence: 0.5,
+        minHandPresenceConfidence: 0.5,
+        minTrackingConfidence: 0.5
+      });
+    }
+    try {
+      _handLandmarker = await _mk('GPU');
+      appLog('ok', 'HandLandmarker prêt (délégué GPU) — cliquez Démarrer !');
+    } catch(eg) {
+      appLog('warn', 'GPU indisponible (' + (eg && eg.message ? eg.message : eg) + ') — repli CPU…');
+      _handLandmarker = await _mk('CPU');
+      appLog('ok', 'HandLandmarker prêt (délégué CPU) — cliquez Démarrer !');
+    }
+    _mpLoaded = true;
     if (pill) { pill.className = 'mp-pill ready'; pill.textContent = '✓ IA prête'; }
-    appLog('ok', 'MediaPipe prêt — local (WASM patché ✓) — cliquez Démarrer !');
   })();
   return _mpPromise;
 }
 
 // Appelé par startCam() — instantané si _bgPreload() a déjà fini ; sinon attend
-// (et réessaie) les fichiers auto-hébergés. Ne charge jamais le CDN.
+// (et réessaie au clic suivant) le chargement du modèle moderne.
 async function ensureMP() {
-  if (_mpLoaded) return;
+  if (_mpLoaded && _handLandmarker) return;
   var lc = document.getElementById('liveConf');
-  if (lc) lc.textContent = 'Préparation de l\'IA… (téléchargement serveur)';
-  try {
-    await _bgPreload();
-  } catch(e) {
-    if (lc) lc.textContent = '';
-    throw new Error('IA pas encore prête — patientez quelques secondes puis réessayez');
-  }
+  if (lc) lc.textContent = 'Chargement du modèle…';
+  await _bgPreload();
+  if (!_handLandmarker) throw new Error('HandLandmarker non initialisé');
 }
 
 /* ── LSF SIGN DICTIONARY ──────────────────────────────── */
@@ -1683,6 +1700,11 @@ window.Module = window.Module || {};
 
 var mpH = null, rafId = null, stream = null, running = false;
 var _gotResult = false, _sendCount = 0, _resultCount = 0, _rejectCount = 0;
+// MediaPipe Tasks Vision (API moderne, chargée depuis le CDN jsDelivr)
+var _TV = null, _handLandmarker = null, _drawUtils = null;
+var TV_VER = '0.10.35';
+var TV_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@' + TV_VER;
+var TV_MODEL = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
 var holdKey = null, holdStart = 0, cooldownUntil = 0;
 var sentence = [], _sentenceObjs = [], debugOn = false;
 var _errCount = 0;
@@ -1763,185 +1785,118 @@ async function startCam() {
   }
 
   document.getElementById('liveConf').textContent = 'Initialisation du modèle…';
-  appLog('info', 'Détection support SIMD WebAssembly…');
-  var simdOk = false;
-  try {
-    simdOk = WebAssembly.validate(new Uint8Array([
-      0,97,115,109,1,0,0,0,1,5,1,96,0,1,123,3,2,1,0,10,10,1,8,0,65,0,253,15,253,98,11
-    ]));
-  } catch(_) {}
-  appLog('info', 'SIMD: ' + (simdOk ? 'supporté ✓' : 'non supporté — utilisation du fichier WASM non-SIMD'));
 
-  // Blob URL patch: only needed for CDN fallback (local files are already patched server-side).
-  // Loading the WASM JS from a Blob URL sets scriptDirectory='' in Emscripten,
-  // which can break the packed-assets loader path resolution.
-  var patchedUrls = {};
-  if (!_useLocal) {
-    var cdnBase = 'https://unpkg.com/@mediapipe/hands@0.4.1646424915/';
-    appLog('info', 'Mode CDN — patch WASM client-side (' + (simdOk ? 'SIMD + non-SIMD' : 'non-SIMD') + ')…');
-    try {
-      if (simdOk) {
-        patchedUrls['hands_solution_simd_wasm_bin.js'] =
-          await _fetchAndPatchJs(cdnBase + 'hands_solution_simd_wasm_bin.js');
-      }
-      patchedUrls['hands_solution_wasm_bin.js'] =
-        await _fetchAndPatchJs(cdnBase + 'hands_solution_wasm_bin.js');
-      appLog('ok', 'Patch CDN appliqué ✓');
-    } catch(e) {
-      appLog('warn', 'Patch CDN partiel: ' + e.message);
-    }
-  } else {
-    appLog('ok', 'Mode local — fichiers WASM déjà patchés côté serveur, Blob URL non utilisé ✓');
-  }
+  if (!_handLandmarker || !_TV) { appLog('err', 'Modèle non initialisé — rechargez la page'); _resetCamUI(); return; }
+  if (!_drawUtils) { try { _drawUtils = new _TV.DrawingUtils(ctx); } catch(_) { _drawUtils = null; } }
 
-  // Pre-define window.Module with locateFile so that hands_solution_packed_assets_loader.js
-  // (loaded as a global script) shares the same Module object as hands_solution_simd_wasm_bin.js.
-  // Both files do: var Module = typeof Module !== 'undefined' ? Module : {}
-  // Pre-defining ensures they reference the same global instance.
-  function _mpLocate(f) {
-    if (!simdOk && f.indexOf('simd_wasm_bin') !== -1) {
-      f = f.replace('simd_wasm_bin', 'wasm_bin');
-    }
-    if (patchedUrls[f]) return patchedUrls[f];
-    return _useLocal
-      ? '/mp/' + f
-      : 'https://unpkg.com/@mediapipe/hands@0.4.1646424915/' + f;
-  }
-  window.Module = (typeof window.Module === 'object' && window.Module) ? window.Module : {};
-  window.Module['locateFile'] = _mpLocate;
-
-  mpH = new Hands({ locateFile: _mpLocate });
-
-  mpH.setOptions({
-    maxNumHands: 2,
-    modelComplexity: 0,
-    minDetectionConfidence: 0.55,
-    minTrackingConfidence: 0.40
-  });
-  appLog('info', 'Modèle: maxMains=2 (bimanuel activé), complexité=0, détection≥55%, suivi≥40%');
-
-  mpH.onResults(function(res) {
-    _resultCount++; _rejectCount = 0;
-    if (!_gotResult) {
-      _gotResult = true;
-      appLog('ok', '✓ Modèle actif — 1re réponse reçue (le graphe MediaPipe tourne)');
-    }
-    ctx.clearRect(0, 0, cvs.width, cvs.height);
-    var lms = res.multiHandLandmarks;
-    var handCount = lms ? lms.length : 0;
-
-    if (!handCount) {
-      _onDetect(null, 0, null);
-      if (debugOn) document.getElementById('dbgBox').textContent = 'Aucune main';
-      return;
-    }
-
-    // Draw all hands with distinct colours
-    for (var hi = 0; hi < handCount; hi++) {
-      var c = HAND_COLOURS[hi] || HAND_COLOURS[0];
-      drawConnectors(ctx, lms[hi], HAND_CONNECTIONS, {color: c[0], lineWidth: 2});
-      drawLandmarks(ctx, lms[hi], {color:'#fff', fillColor: c[1], radius: 3});
-    }
-
-    // ── 2-hand bimanual classification ──
-    if (handCount >= 2) {
-      var bi = classifyBimanual(lms[0], lms[1]);
-      if (bi.sign) {
-        _onDetect(bi.sign, bi.conf, bi.domF);
-        if (debugOn) {
-          var df = bi.domF, nf = bi.nonF;
-          document.getElementById('dbgBox').innerHTML =
-            '👐 BIMANUEL dist=' + bi.dist.toFixed(2) + '<br>' +
-            'D T:'+(df.thumb|0)+' I:'+(df.index|0)+' M:'+(df.middle|0)+' R:'+(df.ring|0)+' P:'+(df.pinky|0)+'<br>' +
-            'G T:'+(nf.thumb|0)+' I:'+(nf.index|0)+' M:'+(nf.middle|0)+' R:'+(nf.ring|0)+' P:'+(nf.pinky|0)+'<br>' +
-            '→ '+bi.sign.fr;
-        }
-        return;
-      }
-    }
-
-    // ── Fallback: classify dominant hand (lower x = user's right) ──
-    var domLm = lms[0];
-    if (handCount >= 2 && lms[1][0].x < lms[0][0].x) domLm = lms[1];
-    var r = classify(domLm);
-    _onDetect(r.sign, r.conf, r.f);
-    if (debugOn) {
-      var f = r.f;
-      document.getElementById('dbgBox').innerHTML =
-        (handCount >= 2 ? '✋✋ 2 mains (unimanuel)<br>' : '') +
-        'T:'+(f.thumb|0)+' I:'+(f.index|0)+' M:'+(f.middle|0)+' R:'+(f.ring|0)+' P:'+(f.pinky|0)+'<br>' +
-        'thumbUp:'+(f.thumbUp|0)+' dn:'+(f.thumbDown|0)+'<br>' +
-        'palmW: '+f.palmW.toFixed(3)+'<br>' +
-        '→ '+(r.sign ? r.sign.fr : '—');
-    }
-  });
-
-  appLog('ok', '── Détection démarrée (20 fps) — ' + SIGNS.length + ' signes unimanuel + ' + BIMANUAL_SIGNS.length + ' signes bimanuel ──');
+  appLog('ok', '── Détection démarrée — ' + SIGNS.length + ' signes unimanuel + ' + BIMANUAL_SIGNS.length + ' signes bimanuel ──');
   running = true; _errCount = 0; _rejectCount = 0; _gotResult = false; _sendCount = 0; _resultCount = 0;
-  var lastTs = 0;
+  var lastTs = 0, _lastVideoTime = -1;
   var FRAME_MS = 1000 / 20;
 
   function loop(ts) {
     if (!running) return;
     rafId = requestAnimationFrame(loop);
-    if (ts - lastTs >= FRAME_MS && vid.readyState >= 2) {
-      lastTs = ts;
-      try {
-        var p = mpH.send({ image: vid });
-        _sendCount++;
-        if (p && typeof p.catch === 'function') {
-          p.catch(function(e) {
-            _rejectCount++;
-            if (_rejectCount === 1) appLog('err', 'mpH.send() rejet: ' + (e && e.message ? e.message : e));
-            if (_rejectCount >= 15 && running) {
-              appLog('err', '⚠ Le moteur MediaPipe a planté (' + (e && e.message ? e.message : e)
-                + ') — arrêt automatique. Rechargez la page.');
-              stopCam();
-            }
-          });
-        }
-        _errCount = 0;
-      } catch(e) {
-        _errCount++;
-        if (_errCount === 1) appLog('err', 'mpH.send() erreur: ' + e.message);
-        if (_errCount >= 10) {
-          appLog('err', 'Arrêt après 10 erreurs consécutives — rechargez la page');
-          stopCam(); return;
-        }
-      }
+    if (ts - lastTs < FRAME_MS || vid.readyState < 2) return;
+    lastTs = ts;
+    // detectForVideo exige un horodatage strictement croissant ; on saute les
+    // images vidéo identiques (sinon l'API lève une erreur).
+    if (vid.currentTime === _lastVideoTime) return;
+    _lastVideoTime = vid.currentTime;
+    var res;
+    try {
+      res = _handLandmarker.detectForVideo(vid, ts);
+      _sendCount++;
+    } catch(e) {
+      _errCount++;
+      if (_errCount === 1) appLog('err', 'detectForVideo erreur : ' + (e && e.message ? e.message : e));
+      if (_errCount >= 15 && running) { appLog('err', 'Trop d\'erreurs — arrêt. Rechargez la page.'); stopCam(); }
+      return;
     }
+    _errCount = 0;
+    _handleLandmarks((res && res.landmarks) ? res.landmarks : [], ctx, cvs);
   }
   rafId = requestAnimationFrame(loop);
   document.getElementById('liveConf').textContent = '✅ Actif — montrez un signe LSF !';
 
-  // Watchdog : si le modèle ne répond pas, on diagnostique (frames envoyées vs
-  // réponses reçues) au lieu de laisser l'utilisateur devant un écran muet.
+  // Watchdog : si le modèle ne répond pas, on diagnostique.
   setTimeout(function() {
     if (!running) return;
     if (!_gotResult) {
       appLog('err', '⚠ Aucune réponse du modèle après 6s — ' + _sendCount
-        + ' frame(s) envoyée(s), 0 reçue(s). Le graphe/modèle ne s\'est pas chargé '
-        + '(readyState vidéo=' + vid.readyState + ').');
+        + ' frame(s) traitée(s) (readyState vidéo=' + vid.readyState + ').');
     } else {
-      appLog('info', 'Diagnostic 6s : ' + _sendCount + ' frames envoyées, '
-        + _resultCount + ' réponses — le modèle fonctionne. Montrez bien votre '
+      appLog('info', 'Diagnostic 6s : ' + _sendCount + ' frames traitées, '
+        + _resultCount + ' détections — le modèle fonctionne. Montrez votre '
         + 'main entière, paume vers la caméra, bien éclairée.');
     }
   }, 6000);
 }
 
+/* ── TRAITEMENT DES LANDMARKS (tasks-vision) ──────────────
+   lms = result.landmarks : tableau de mains, chacune 21 points {x,y,z}
+   normalisés 0-1 — même format que l'ancienne API, donc classify/getFingers
+   et classifyBimanual fonctionnent tels quels. */
+function _handleLandmarks(lms, ctx, cvs) {
+  _resultCount++; _rejectCount = 0;
+  if (!_gotResult) { _gotResult = true; appLog('ok', '✓ Modèle actif — 1re détection reçue'); }
+  ctx.clearRect(0, 0, cvs.width, cvs.height);
+  var handCount = lms ? lms.length : 0;
+
+  if (!handCount) {
+    _onDetect(null, 0, null);
+    if (debugOn) document.getElementById('dbgBox').textContent = 'Aucune main';
+    return;
+  }
+
+  for (var hi = 0; hi < handCount; hi++) {
+    var c = HAND_COLOURS[hi] || HAND_COLOURS[0];
+    if (_drawUtils && _TV) {
+      try {
+        _drawUtils.drawConnectors(lms[hi], _TV.HandLandmarker.HAND_CONNECTIONS, { color: c[0], lineWidth: 3 });
+        _drawUtils.drawLandmarks(lms[hi], { color: '#fff', fillColor: c[1], radius: 3, lineWidth: 1 });
+      } catch(_) {}
+    }
+  }
+
+  if (handCount >= 2) {
+    var bi = classifyBimanual(lms[0], lms[1]);
+    if (bi.sign) {
+      _onDetect(bi.sign, bi.conf, bi.domF);
+      if (debugOn) {
+        var df = bi.domF, nf = bi.nonF;
+        document.getElementById('dbgBox').innerHTML =
+          '👐 BIMANUEL dist=' + bi.dist.toFixed(2) + '<br>' +
+          'D T:'+(df.thumb|0)+' I:'+(df.index|0)+' M:'+(df.middle|0)+' R:'+(df.ring|0)+' P:'+(df.pinky|0)+'<br>' +
+          'G T:'+(nf.thumb|0)+' I:'+(nf.index|0)+' M:'+(nf.middle|0)+' R:'+(nf.ring|0)+' P:'+(nf.pinky|0)+'<br>' +
+          '→ '+bi.sign.fr;
+      }
+      return;
+    }
+  }
+
+  var domLm = lms[0];
+  if (handCount >= 2 && lms[1][0].x < lms[0][0].x) domLm = lms[1];
+  var r = classify(domLm);
+  _onDetect(r.sign, r.conf, r.f);
+  if (debugOn) {
+    var f = r.f;
+    document.getElementById('dbgBox').innerHTML =
+      (handCount >= 2 ? '✋✋ 2 mains (unimanuel)<br>' : '') +
+      'T:'+(f.thumb|0)+' I:'+(f.index|0)+' M:'+(f.middle|0)+' R:'+(f.ring|0)+' P:'+(f.pinky|0)+'<br>' +
+      'thumbUp:'+(f.thumbUp|0)+' dn:'+(f.thumbDown|0)+'<br>' +
+      'palmW: '+f.palmW.toFixed(3)+'<br>' +
+      '→ '+(r.sign ? r.sign.fr : '—');
+  }
+}
+
 function stopCam() {
   running = false;
   if (rafId)  { cancelAnimationFrame(rafId); rafId = null; }
-  if (mpH)    { try { mpH.close(); } catch(_) {} mpH = null; }
   if (stream) { stream.getTracks().forEach(function(t) { t.stop(); }); stream = null; }
-  _revokeBlobUrls();
-  // Reset Module state for next startCam(), but NEVER delete window.Module —
-  // packed_assets_loader.js (already loaded as a <script>) uses it as a bare
-  // global; deleting it causes ReferenceError on every subsequent start.
-  window.Module = {};
+  // _handLandmarker reste chargé en mémoire pour un redémarrage instantané.
   document.getElementById('cvs').getContext('2d').clearRect(0, 0, 9999, 9999);
-  appLog('info', 'Caméra et modèle arrêtés');
+  appLog('info', 'Caméra arrêtée');
   _resetCamUI();
 }
 

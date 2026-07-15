@@ -1022,6 +1022,28 @@ function appLog(type, msg) {
 function _esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
+// Capture console.warn/error into the diagnostic log. MediaPipe's internal
+// runtime errors go through printErr → console.warn and are otherwise invisible
+// in the copied logs. This is how we finally SEE why the graph stays silent.
+(function() {
+  function wrap(orig, kind) {
+    return function() {
+      try {
+        var parts = [];
+        for (var i = 0; i < arguments.length; i++) {
+          var a = arguments[i];
+          parts.push(typeof a === 'string' ? a : (a && a.message) ? a.message : String(a));
+        }
+        appLog(kind, '[console] ' + parts.join(' ').substring(0, 240));
+      } catch(e) {}
+      return orig.apply(console, arguments);
+    };
+  }
+  if (window.console) {
+    console.warn  = wrap(console.warn  || function(){}, 'warn');
+    console.error = wrap(console.error || function(){}, 'err');
+  }
+})();
 function toggleLog() {
   _logOpen = !_logOpen;
   document.getElementById('logBody').classList.toggle('open', _logOpen);

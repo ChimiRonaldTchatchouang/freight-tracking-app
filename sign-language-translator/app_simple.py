@@ -35,7 +35,7 @@ def _fetch_bytes(url):
     with urlopen(req, timeout=90) as r:
         return r.read()
 
-_PATCH_VER = '7'  # bump whenever patching logic changes to force cache invalidation
+_PATCH_VER = '8'  # bump whenever patching logic changes to force cache invalidation
 
 # Emscripten installs an ABORTING getter on Module.arguments (and other legacy
 # props) via legacyModuleProp(prop, newName). On modern Chrome the runtime reads
@@ -99,12 +99,35 @@ def _patch_mp(fname, raw):
 
 _dl_lock = threading.Lock()
 
+# Exact sizes of the binary assets (never patched). A truncated .data/.wasm is
+# the classic cause of "Calculator … not found" + WASM heap corruption, and the
+# old `size > 100` check let partial downloads through. Binary files must match
+# EXACTLY; patched .js files (size shifts a few bytes) only need a sane minimum.
+_MP_EXACT = {
+    'hands_solution_packed_assets.data': 4326731,
+    'hands_solution_simd_wasm_bin.wasm': 6293458,
+    'hands_solution_wasm_bin.wasm':      6180725,
+}
+_MP_MIN = {
+    'hands.js':                                30000,
+    'hands_solution_packed_assets_loader.js':   6000,
+    'hands_solution_simd_wasm_bin.js':        240000,
+    'hands_solution_wasm_bin.js':             240000,
+    'drawing_utils.js':                         2000,
+}
+
+def _size_ok(fname, size):
+    if fname in _MP_EXACT:
+        return size == _MP_EXACT[fname]
+    return size >= _MP_MIN.get(fname, 100)
+
 def _dl_one(url_fname):
     """Download and patch one MediaPipe file; returns True on success.
-    Tries unpkg then the jsDelivr mirror, each with a browser User-Agent."""
+    Tries unpkg then the jsDelivr mirror, each with a browser User-Agent.
+    Verifies the file size so truncated/corrupt downloads are rejected."""
     url, fname = url_fname
     dest = _MP_DIR / fname
-    if dest.exists() and dest.stat().st_size > 100:
+    if dest.exists() and _size_ok(fname, dest.stat().st_size):
         with _dl_lock:
             _mp_status['done'] += 1
         return True
@@ -115,6 +138,9 @@ def _dl_one(url_fname):
             host = u.split('/')[2]
             try:
                 data = _patch_mp(fname, _fetch_bytes(u))
+                if not _size_ok(fname, len(data)):
+                    exp = _MP_EXACT.get(fname) or ('>=' + str(_MP_MIN.get(fname, 100)))
+                    raise IOError(f'taille invalide {len(data)} (attendu {exp})')
                 dest.write_bytes(data)
                 with _dl_lock:
                     _mp_status['done'] += 1
@@ -180,7 +206,7 @@ _dl_start_lock = threading.Lock()
 
 def _files_on_disk():
     return sum(1 for _u, f in _MP_FILES
-               if (_MP_DIR / f).exists() and (_MP_DIR / f).stat().st_size > 100)
+               if (_MP_DIR / f).exists() and _size_ok(f, (_MP_DIR / f).stat().st_size))
 
 def _mp_ready_on_disk():
     ver_file = _MP_DIR / '.patch_ver'
@@ -1656,7 +1682,7 @@ function _addPredSign(key) {
 window.Module = window.Module || {};
 
 var mpH = null, rafId = null, stream = null, running = false;
-var _gotResult = false, _sendCount = 0, _resultCount = 0;
+var _gotResult = false, _sendCount = 0, _resultCount = 0, _rejectCount = 0;
 var holdKey = null, holdStart = 0, cooldownUntil = 0;
 var sentence = [], _sentenceObjs = [], debugOn = false;
 var _errCount = 0;
@@ -1795,7 +1821,7 @@ async function startCam() {
   appLog('info', 'Modèle: maxMains=2 (bimanuel activé), complexité=0, détection≥55%, suivi≥40%');
 
   mpH.onResults(function(res) {
-    _resultCount++;
+    _resultCount++; _rejectCount = 0;
     if (!_gotResult) {
       _gotResult = true;
       appLog('ok', '✓ Modèle actif — 1re réponse reçue (le graphe MediaPipe tourne)');
@@ -1851,7 +1877,7 @@ async function startCam() {
   });
 
   appLog('ok', '── Détection démarrée (20 fps) — ' + SIGNS.length + ' signes unimanuel + ' + BIMANUAL_SIGNS.length + ' signes bimanuel ──');
-  running = true; _errCount = 0; _gotResult = false; _sendCount = 0; _resultCount = 0;
+  running = true; _errCount = 0; _rejectCount = 0; _gotResult = false; _sendCount = 0; _resultCount = 0;
   var lastTs = 0;
   var FRAME_MS = 1000 / 20;
 
@@ -1865,7 +1891,13 @@ async function startCam() {
         _sendCount++;
         if (p && typeof p.catch === 'function') {
           p.catch(function(e) {
-            if (_errCount++ === 0) appLog('err', 'mpH.send() rejet: ' + (e && e.message ? e.message : e));
+            _rejectCount++;
+            if (_rejectCount === 1) appLog('err', 'mpH.send() rejet: ' + (e && e.message ? e.message : e));
+            if (_rejectCount >= 15 && running) {
+              appLog('err', '⚠ Le moteur MediaPipe a planté (' + (e && e.message ? e.message : e)
+                + ') — arrêt automatique. Rechargez la page.');
+              stopCam();
+            }
           });
         }
         _errCount = 0;

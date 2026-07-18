@@ -912,6 +912,114 @@ textarea{resize:vertical;min-height:100px;grid-column:1/-1}
   .app-nav .anav span{display:none}
   .lp-nav-links a:not(.btn-hero){display:none}
 }
+/* ══ DARK THEME ══════════════════════════════════════════ */
+body.dark{
+  --bg:#0a0a12;--card:#14141f;--border:#262639;--text:#e7e9f2;--muted:#9096ad;
+  --sh:0 1px 3px rgba(0,0,0,.5);--sh2:0 12px 44px rgba(0,0,0,.6);
+}
+body.dark .dash-panel,body.dark .qa-card,body.dark .set-card,body.dark .hist-item,
+body.dark .feat-card,body.dark .auth-card,body.dark .auth-right,body.dark .prof-card{background:var(--card)}
+body.dark .stat-tile,body.dark .gram-box,body.dark .met,body.dark .sign-card{background:#1c1c2b;border-color:var(--border)}
+body.dark .sign-card{background:linear-gradient(135deg,#1c1c2b,#221c33);border-color:#332a4d}
+body.dark .sign-card h4{color:#a5b4fc}
+body.dark .sp{background:#12121c;border-color:var(--border)}
+body.dark .spv,body.dark .gv{color:#cbd0e2}
+body.dark input,body.dark select,body.dark textarea{background:#12121c;color:var(--text);border-color:var(--border)}
+body.dark .anav:hover,body.dark .qa-card:hover,body.dark .user-dropdown button:hover,body.dark .set-row select{background:#1c1c2b}
+body.dark .user-dropdown{background:var(--card)}
+body.dark .lp-nav{background:rgba(10,10,18,.85)}
+body.dark .auth-wrap{background:linear-gradient(135deg,#0a0a12,#140f22)}
+body.dark .lp-visual{background:linear-gradient(135deg,#141024,#1a1030)}
+body.dark .idle-overlay,body.dark .vid-card{background:#0f0f18}
+body.dark .btn-hero.ghost{background:#14141f;color:var(--text)}
+body.dark .stat-v{color:#a5b4fc}
+body.dark .ai-ic,body.dark .hist-ic,body.dark .feat-ic,body.dark .qa-ic{filter:brightness(.9)}
+
+/* ══ SIDEBAR SHELL ══════════════════════════════════════ */
+#scr-app{display:flex;min-height:100vh}
+#scr-app.hidden{display:none}
+.sidebar{width:248px;flex-shrink:0;background:linear-gradient(180deg,#0b0d1a,#090a12);color:#cbd5e1;display:flex;flex-direction:column;padding:1.1rem .9rem;position:sticky;top:0;height:100vh;border-right:1px solid rgba(255,255,255,.06);z-index:80}
+.sb-brand{display:flex;align-items:center;gap:.6rem;padding:.3rem .4rem 1.2rem}
+.sb-brand .brand-icon{font-size:24px}
+.sb-brand .brand-name{font-size:19px;font-weight:900;color:#fff;letter-spacing:-.01em}
+.sb-sec{font-size:10px;font-weight:800;letter-spacing:.12em;color:#5b6479;padding:.3rem .6rem;margin-top:.4rem}
+.sb-item{display:flex;align-items:center;gap:.7rem;width:100%;padding:.6rem .7rem;border:none;background:transparent;color:#aab2c7;border-radius:9px;font-size:13.5px;font-weight:600;cursor:pointer;transition:all .15s;text-align:left;margin-bottom:2px}
+.sb-item:hover{background:rgba(255,255,255,.05);color:#fff}
+.sb-item.active{background:linear-gradient(135deg,var(--brand),var(--accent));color:#fff;box-shadow:0 4px 14px rgba(79,70,229,.35)}
+.sb-item .sb-ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
+.sb-sub{margin:2px 0 6px 1.6rem;display:none;flex-direction:column;gap:1px;border-left:1px solid rgba(255,255,255,.08);padding-left:.5rem}
+.sb-sub.open{display:flex}
+.sb-subitem{text-align:left;padding:.42rem .6rem;border:none;background:transparent;color:#8b93a9;border-radius:7px;font-size:12.5px;font-weight:600;cursor:pointer}
+.sb-subitem:hover{background:rgba(255,255,255,.05);color:#fff}
+.sb-subitem.active{color:#a5b4fc}
+.sb-spacer{flex:1}
+.sb-bottom{border-top:1px solid rgba(255,255,255,.07);padding-top:.7rem;display:flex;flex-direction:column;gap:.5rem}
+.sb-user{display:flex;align-items:center;gap:.6rem;padding:.5rem;border-radius:11px;cursor:pointer;border:1px solid rgba(255,255,255,.08);transition:background .15s}
+.sb-user:hover{background:rgba(255,255,255,.05)}
+.sb-user .u-avatar{width:34px;height:34px}
+.sb-user .u-name{font-size:13px;font-weight:800;color:#fff;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sb-user .u-status{font-size:10.5px;color:#22c55e;font-weight:700}
+.sb-foot{display:flex;align-items:center;justify-content:space-between;gap:.5rem}
+.sb-theme{display:flex;align-items:center;gap:.45rem;padding:.45rem .7rem;border:1px solid rgba(255,255,255,.1);background:transparent;color:#aab2c7;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;flex:1}
+.sb-theme:hover{background:rgba(255,255,255,.05);color:#fff}
+.app-main{flex:1;min-width:0;display:flex;flex-direction:column}
+.mp-pill{align-self:center}
+
+/* mobile topbar */
+.m-topbar{display:none;align-items:center;gap:.7rem;padding:.6rem 1rem;background:#0b0d1a;color:#fff;position:sticky;top:0;z-index:70;border-bottom:1px solid rgba(255,255,255,.08)}
+.m-burger{background:none;border:none;color:#fff;font-size:22px;cursor:pointer;line-height:1}
+.m-topbar .brand-name{font-size:16px;font-weight:900;color:#fff}
+.sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:79}
+
+/* ══ ONBOARDING ══════════════════════════════════════════ */
+.ob-wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.5rem;background:radial-gradient(1200px 600px at 70% -10%,#1e1b4b,#0a0a12 60%);color:#e7e9f2}
+.ob-back{position:fixed;top:1.2rem;left:1.4rem;background:none;border:none;color:#cbd5e1;font-size:22px;cursor:pointer}
+.ob-card{width:100%;max-width:600px;background:rgba(20,20,31,.7);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:2.2rem}
+.ob-card .brand{margin-bottom:1.4rem}
+.ob-card .brand-name{color:#fff}
+.ob-card h2{font-size:24px;font-weight:900;margin-bottom:.4rem;color:#fff}
+.ob-card .ob-sub{font-size:13.5px;color:#9096ad;margin-bottom:1.5rem}
+.ob-field label{display:block;font-size:12.5px;font-weight:700;margin-bottom:.5rem;color:#cbd5e1}
+.ob-field input{width:100%;padding:.85rem 1rem;border-radius:11px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:#fff;font:inherit;font-size:15px;outline:none;margin-bottom:1.4rem}
+.ob-field input:focus{border-color:var(--brand)}
+.ob-themes{display:flex;gap:.6rem;margin-bottom:1.6rem;flex-wrap:wrap}
+.ob-theme{flex:1;min-width:120px;padding:.8rem;border-radius:11px;border:1.5px solid rgba(255,255,255,.12);background:rgba(255,255,255,.03);color:#cbd5e1;font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;text-align:center}
+.ob-theme:hover{border-color:rgba(255,255,255,.3)}
+.ob-theme.sel{border-color:var(--brand);background:rgba(79,70,229,.18);color:#fff}
+.ob-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.7rem;margin-bottom:1.6rem}
+.ob-opt{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;padding:1.1rem .6rem;border-radius:12px;border:1.5px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);color:#cbd5e1;font-size:12.5px;font-weight:700;cursor:pointer;transition:all .15s;text-align:center;min-height:96px}
+.ob-opt .ob-ic{font-size:22px}
+.ob-opt:hover{border-color:rgba(255,255,255,.3);background:rgba(255,255,255,.05)}
+.ob-opt.sel{border-color:var(--brand);background:rgba(79,70,229,.2);color:#fff}
+.ob-actions{display:flex;justify-content:center;margin-top:.4rem}
+.ob-btn{background:var(--brand);color:#fff;border:none;padding:.75rem 2rem;border-radius:11px;font-size:14px;font-weight:800;cursor:pointer;transition:filter .15s}
+.ob-btn:hover{filter:brightness(1.1)}
+.ob-btn:disabled{opacity:.45;cursor:not-allowed}
+.ob-prog{margin-top:2rem;display:flex;align-items:center;gap:.8rem;width:100%;max-width:600px}
+.ob-bar{flex:1;height:7px;border-radius:99px;background:rgba(255,255,255,.1);overflow:hidden}
+.ob-bar span{display:block;height:100%;background:linear-gradient(90deg,var(--brand),#60a5fa);border-radius:99px;transition:width .35s}
+.ob-step{font-size:12px;color:#9096ad;font-weight:700}
+
+/* ══ PROFILE ══════════════════════════════════════════════ */
+.prof-card{background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:var(--sh);overflow:hidden}
+.prof-head{display:flex;align-items:center;gap:1.2rem;padding:1.6rem}
+.prof-avatar{width:82px;height:82px;border-radius:50%;object-fit:cover;background:#e0e7ff}
+.prof-name{font-size:21px;font-weight:900}
+.prof-email{font-size:13.5px;color:var(--muted);margin-bottom:.7rem}
+.prof-menu{border-top:1px solid var(--border)}
+.prof-mitem{display:flex;align-items:center;gap:.9rem;width:100%;padding:1rem 1.6rem;border:none;background:transparent;color:var(--text);font-size:14.5px;font-weight:600;cursor:pointer;border-bottom:1px solid var(--border);text-align:left;transition:background .15s}
+.prof-mitem:last-child{border-bottom:none}
+.prof-mitem:hover{background:rgba(127,127,160,.08)}
+.prof-mitem .pm-ic{font-size:18px;width:24px;text-align:center}
+.prof-mitem.danger{color:var(--red)}
+
+@media(max-width:860px){
+  .sidebar{position:fixed;left:0;top:0;transform:translateX(-100%);transition:transform .25s;box-shadow:0 0 40px rgba(0,0,0,.5)}
+  .sidebar.open{transform:translateX(0)}
+  .sb-overlay.open{display:block}
+  .m-topbar{display:flex}
+  .ob-grid{grid-template-columns:1fr 1fr}
+}
 </style>
 </head>
 <body>
@@ -1023,34 +1131,87 @@ textarea{resize:vertical;min-height:100px;grid-column:1/-1}
 </div>
 
 <!-- ══════════════════════════ APP ══════════════════════════ -->
-<div id="scr-app" class="hidden">
-<header class="app-top">
-  <div class="brand">
-    <span class="brand-icon">🤟</span>
-    <div>
-      <div class="brand-name">SignVoice</div>
-      <div class="brand-sub">Interprète LSF</div>
-    </div>
-  </div>
-  <nav class="app-nav">
-    <button class="anav active" data-view="home"      onclick="showView('home',this)">🏠<span>Accueil</span></button>
-    <button class="anav"        data-view="interpret" onclick="showView('interpret',this)">🎥<span>Interprétation</span></button>
-    <button class="anav"        data-view="history"   onclick="showView('history',this)">🕘<span>Historique</span></button>
-    <button class="anav"        data-view="settings"  onclick="showView('settings',this)">⚙<span>Réglages</span></button>
-  </nav>
-  <div class="app-top-right">
-    <div class="mp-pill loading" id="mpPill">⏳ …</div>
-    <div class="user-menu" onclick="toggleUserMenu(event)">
-      <img id="uAvatar" class="u-avatar" alt="">
-      <span id="uName" class="u-name">—</span>
-      <div class="user-dropdown" id="userDropdown">
-        <div class="ud-head"><img id="udAvatar" class="u-avatar" alt=""><div><div id="udName" class="ud-name"></div><div id="udEmail" class="ud-email"></div></div></div>
-        <button onclick="showView('settings')">⚙ Réglages</button>
-        <button onclick="signOut()">↩ Déconnexion</button>
+<!-- ══════════════════════════ ONBOARDING ══════════════════════════ -->
+<div id="scr-onboard" class="scr hidden">
+  <div class="ob-wrap">
+    <button class="ob-back" id="obBack" onclick="obPrev()">←</button>
+
+    <!-- STEP 1 : nom + thème -->
+    <div class="ob-card ob-step-card" id="obStep1">
+      <div class="brand"><span class="brand-icon">🤟</span><div class="brand-name">SignVoice</div></div>
+      <h2>Personnalisons votre interprète</h2>
+      <div class="ob-sub">Comment souhaitez-vous être appelé·e ?</div>
+      <div class="ob-field">
+        <label>Votre prénom</label>
+        <input id="obName" type="text" placeholder="ex : Amara" autocomplete="given-name">
       </div>
+      <div class="ob-field">
+        <label>Quelle apparence préférez-vous ?</label>
+        <div class="ob-themes">
+          <div class="ob-theme" data-theme="system" onclick="obPickTheme(this,'system')">🖥️ Thème système</div>
+          <div class="ob-theme" data-theme="light"  onclick="obPickTheme(this,'light')">☀️ Clair</div>
+          <div class="ob-theme sel" data-theme="dark" onclick="obPickTheme(this,'dark')">🌙 Sombre</div>
+        </div>
+      </div>
+      <div class="ob-actions"><button class="ob-btn" onclick="obNext()">Continuer</button></div>
+    </div>
+
+    <!-- STEP 2 : usages -->
+    <div class="ob-card ob-step-card hidden" id="obStep2">
+      <div class="brand"><span class="brand-icon">🤟</span><div class="brand-name">SignVoice</div></div>
+      <h2>Pour quoi voulez-vous utiliser SignVoice ?</h2>
+      <div class="ob-sub">Sélectionnez au moins 2 usages pour personnaliser votre expérience.</div>
+      <div class="ob-grid" id="obUses"></div>
+      <div class="ob-actions"><button class="ob-btn" id="obUsesBtn" onclick="obNext()">Continuer</button></div>
+    </div>
+
+    <!-- STEP 3 : profil -->
+    <div class="ob-card ob-step-card hidden" id="obStep3">
+      <div class="brand"><span class="brand-icon">🤟</span><div class="brand-name">SignVoice</div></div>
+      <h2>Parlez-nous un peu de vous</h2>
+      <div class="ob-sub">Sélectionnez au moins 1 profil pour personnaliser votre expérience.</div>
+      <div class="ob-grid" id="obRoles"></div>
+      <div class="ob-actions"><button class="ob-btn" id="obRolesBtn" onclick="obFinish()">Terminer →</button></div>
+    </div>
+
+    <div class="ob-prog">
+      <div class="ob-bar"><span id="obBar" style="width:33%"></span></div>
+      <div class="ob-step" id="obStepLabel">1/3</div>
     </div>
   </div>
-</header>
+</div>
+<div id="scr-app" class="hidden">
+<div class="sb-overlay" id="sbOverlay" onclick="closeSidebar()"></div>
+<aside class="sidebar" id="sidebar">
+  <div class="sb-brand"><span class="brand-icon">🤟</span><span class="brand-name">SignVoice</span></div>
+  <div class="sb-sec">MENU</div>
+  <button class="sb-item active" data-view="home" onclick="showView('home',this)"><span class="sb-ic">🏠</span> Accueil</button>
+  <button class="sb-item" data-view="interpret" onclick="_toggleInterpretMenu(this)"><span class="sb-ic">🎥</span> Interprétation</button>
+  <div class="sb-sub" id="sbInterpretSub">
+    <button class="sb-subitem" onclick="showView('interpret');switchTabByName('cam')">📷 Caméra</button>
+    <button class="sb-subitem" onclick="showView('interpret');switchTabByName('talk')">💬 Dialogue</button>
+    <button class="sb-subitem" onclick="showView('interpret');switchTabByName('text')">📝 Texte</button>
+  </div>
+  <button class="sb-item" data-view="history" onclick="showView('history',this)"><span class="sb-ic">🕘</span> Historique</button>
+  <button class="sb-item" data-view="settings" onclick="showView('settings',this)"><span class="sb-ic">⚙</span> Réglages</button>
+  <div class="sb-spacer"></div>
+  <div class="sb-bottom">
+    <div class="sb-user" onclick="showView('profile')">
+      <img id="uAvatar" class="u-avatar" alt="">
+      <div><div id="uName" class="u-name">—</div><div class="u-status">● Connecté</div></div>
+    </div>
+    <div class="sb-foot">
+      <button class="sb-theme" onclick="toggleTheme()"><span id="themeIcon">🌙</span> <span id="themeLabel">Sombre</span></button>
+      <div class="mp-pill loading" id="mpPill">⏳ …</div>
+    </div>
+  </div>
+</aside>
+
+<div class="app-main">
+<div class="m-topbar">
+  <button class="m-burger" onclick="openSidebar()">☰</button>
+  <span class="brand-name">SignVoice</span>
+</div>
 
 <!-- ── VIEW : ACCUEIL / DASHBOARD ── -->
 <div id="view-home" class="app-view active">
@@ -1429,6 +1590,31 @@ textarea{resize:vertical;min-height:100px;grid-column:1/-1}
   </div>
 </div>
 
+<!-- ── VIEW : PROFIL ── -->
+<div id="view-profile" class="app-view">
+  <div class="page-wrap">
+    <h1 style="text-align:center;margin-bottom:1.2rem">Mon profil</h1>
+    <div class="prof-card">
+      <div class="prof-head">
+        <img id="profAvatar" class="prof-avatar" alt="">
+        <div style="flex:1;min-width:0">
+          <div class="prof-name" id="profName">—</div>
+          <div class="prof-email" id="profEmail">—</div>
+          <button class="btn-hero primary" style="padding:.5rem 1.1rem;font-size:13px" onclick="showView('settings')">Modifier le profil</button>
+        </div>
+      </div>
+      <div class="prof-menu">
+        <button class="prof-mitem" onclick="showView('settings')"><span class="pm-ic">⚙</span> Réglages</button>
+        <button class="prof-mitem" onclick="showView('history')"><span class="pm-ic">🕘</span> Historique</button>
+        <button class="prof-mitem" onclick="toggleTheme()"><span class="pm-ic">🌓</span> Changer de thème</button>
+        <button class="prof-mitem" onclick="alert('Aide : montrez votre main entière, paume vers la caméra, bien éclairée. Maintenez un signe 1 s pour l\'ajouter à la phrase.')"><span class="pm-ic">❓</span> Centre d'aide</button>
+        <button class="prof-mitem" onclick="alert('SignVoice traduit la langue des signes (LSF) en temps réel via l\'IA, dans les deux sens : signes vers parole/texte et parole vers texte.')"><span class="pm-ic">💬</span> FAQ</button>
+        <button class="prof-mitem danger" onclick="signOut()"><span class="pm-ic">↩</span> Déconnexion</button>
+      </div>
+    </div>
+  </div>
+</div>
+</div><!-- /app-main -->
 </div><!-- /scr-app -->
 <script>
 /* ── TABS ──────────────────────────────────────────────── */
@@ -1580,7 +1766,7 @@ function _loadSession(){ try{ var r=localStorage.getItem('sv_session'); if(r) _s
 function _saveSession(){ try{ localStorage.setItem('sv_session', JSON.stringify(_session)); }catch(e){} }
 
 function showScreen(name){
-  ['landing','auth','app'].forEach(function(s){ var el=document.getElementById('scr-'+s); if(el) el.classList.toggle('hidden', s!==name); });
+  ['landing','auth','onboard','app'].forEach(function(s){ var el=document.getElementById('scr-'+s); if(el) el.classList.toggle('hidden', s!==name); });
   window.scrollTo(0,0);
 }
 function goAuth(mode){ showScreen('auth'); _setAuthMode(mode==='signup'?'signup':'signin'); }
@@ -1624,9 +1810,10 @@ function _completeLogin(user){
   user.since = Date.now();
   _session = user; _saveSession();
   _applySession();
-  showScreen('app'); showView('home');
   recordEvent('🔑', 'Connexion', user.email);
   appLog('ok','Connecté : '+user.email+' ('+user.provider+')');
+  if(!localStorage.getItem('sv_onboarded')) startOnboarding();
+  else { showScreen('app'); showView('home'); }
 }
 
 function _avatarFor(u){
@@ -1644,7 +1831,7 @@ function _applySession(){
   set('uName',_session.name); set('udName',_session.name); set('udEmail',_session.email);
   set('setName',_session.name); set('setEmail',_session.email);
   var hr=new Date().getHours(), greet=hr<12?'Bonjour':hr<18?'Bon après-midi':'Bonsoir';
-  set('dashGreeting', greet+', '+String(_session.name).split(' ')[0]+' 👋');
+  set('dashGreeting', greet+', '+String(_session.firstName||_session.name).split(' ')[0]+' 👋');
   _refreshDash();
 }
 
@@ -1658,12 +1845,14 @@ function closeUserMenu(){ var d=document.getElementById('userDropdown'); if(d) d
 document.addEventListener('click', function(){ closeUserMenu(); });
 
 function showView(name, btn){
-  ['home','interpret','history','settings'].forEach(function(v){ var el=document.getElementById('view-'+v); if(el) el.classList.toggle('active', v===name); });
-  document.querySelectorAll('.anav').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-view')===name); });
-  window.scrollTo(0,0); closeUserMenu();
+  ['home','interpret','history','settings','profile'].forEach(function(v){ var el=document.getElementById('view-'+v); if(el) el.classList.toggle('active', v===name); });
+  document.querySelectorAll('.sb-item').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-view')===name); });
+  var sub=document.getElementById('sbInterpretSub'); if(sub) sub.classList.toggle('open', name==='interpret');
+  window.scrollTo(0,0); closeUserMenu(); closeSidebar();
   if(name==='history') _renderHistory();
   if(name==='home') _refreshDash();
   if(name==='settings') _refreshSettings();
+  if(name==='profile') _refreshProfile();
 }
 function switchTabByName(n){ var b=document.querySelector('.sub-tabs .tab-btn[onclick*="\'"+n+"\'"]'); if(b) switchTab(n,b); }
 
@@ -1733,9 +1922,99 @@ async function _initGoogleAuth(){
 
 function _bootAuth(){
   _loadSession();
+  _loadTheme();
   _initGoogleAuth();
-  if(_session){ _applySession(); showScreen('app'); showView('home'); }
-  else { showScreen('landing'); }
+  if(_session){
+    _applySession();
+    if(localStorage.getItem('sv_onboarded')){ showScreen('app'); showView('home'); }
+    else startOnboarding();
+  } else {
+    showScreen('landing');
+  }
+}
+
+/* ══════════════ THÈME · SIDEBAR · ONBOARDING · PROFIL ══════════════ */
+function _applyTheme(mode){
+  var dark = mode==='dark' || (mode==='system' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.body.classList.toggle('dark', dark);
+  var ic=document.getElementById('themeIcon'), lb=document.getElementById('themeLabel');
+  if(ic) ic.textContent = dark?'☀️':'🌙';
+  if(lb) lb.textContent = dark?'Clair':'Sombre';
+}
+function setTheme(mode){ try{ localStorage.setItem('sv_theme', mode); }catch(e){} _applyTheme(mode); }
+function toggleTheme(){ setTheme(document.body.classList.contains('dark')?'light':'dark'); }
+function _loadTheme(){ _applyTheme(localStorage.getItem('sv_theme')||'light'); }
+
+function openSidebar(){ document.getElementById('sidebar').classList.add('open'); document.getElementById('sbOverlay').classList.add('open'); }
+function closeSidebar(){ var s=document.getElementById('sidebar'); if(s) s.classList.remove('open'); var o=document.getElementById('sbOverlay'); if(o) o.classList.remove('open'); }
+function _toggleInterpretMenu(btn){ var s=document.getElementById('sbInterpretSub'); if(s) s.classList.toggle('open'); showView('interpret',btn); }
+
+function _refreshProfile(){
+  if(!_session) return;
+  var av=_avatarFor(_session), e;
+  if(e=document.getElementById('profAvatar')) e.src=av;
+  if(e=document.getElementById('profName')) e.textContent=_session.firstName? (_session.firstName+' · '+_session.name) : _session.name;
+  if(e=document.getElementById('profEmail')) e.textContent=_session.email;
+}
+
+/* Onboarding */
+var _obStep=1, _obData={name:'',theme:'dark',uses:[],roles:[]};
+var OB_USES=[
+  {k:'learn',ic:'📖',t:'Apprendre la LSF'},
+  {k:'interpret',ic:'🔁',t:'Interprétation / traduction'},
+  {k:'teach',ic:'🎓',t:'Enseigner / former'},
+  {k:'access',ic:'♿',t:'Accessibilité'},
+  {k:'community',ic:'🤝',t:'Communauté'},
+  {k:'research',ic:'🔬',t:'Recherche / dév.'}
+];
+var OB_ROLES=[
+  {k:'student',ic:'🎓',t:'Étudiant·e'},
+  {k:'educator',ic:'🧑‍🏫',t:'Enseignant·e'},
+  {k:'healthcare',ic:'⚕️',t:'Santé'},
+  {k:'researcher',ic:'🔎',t:'Chercheur·se'},
+  {k:'developer',ic:'💻',t:'Développeur·se'},
+  {k:'parent',ic:'👪',t:'Parent'},
+  {k:'enthusiast',ic:'✨',t:'Passionné·e'}
+];
+function startOnboarding(){
+  _obData={ name:(_session&&_session.name)?_session.name.split(' ')[0]:'', theme:(localStorage.getItem('sv_theme')||'dark'), uses:[], roles:[] };
+  var n=document.getElementById('obName'); if(n) n.value=_obData.name;
+  document.querySelectorAll('.ob-theme').forEach(function(c){ c.classList.toggle('sel', c.getAttribute('data-theme')===_obData.theme); });
+  _obBuild('obUses', OB_USES, _obData.uses);
+  _obBuild('obRoles', OB_ROLES, _obData.roles);
+  _obShow(1);
+  showScreen('onboard');
+}
+function _obBuild(id, arr, sel){
+  var c=document.getElementById(id); if(!c) return; c.innerHTML='';
+  arr.forEach(function(o){
+    var d=document.createElement('div'); d.className='ob-opt'+(sel.indexOf(o.k)>=0?' sel':'');
+    d.innerHTML='<span class="ob-ic">'+o.ic+'</span>'+o.t;
+    d.onclick=function(){ var i=sel.indexOf(o.k); if(i>=0) sel.splice(i,1); else sel.push(o.k); d.classList.toggle('sel'); };
+    c.appendChild(d);
+  });
+}
+function obPickTheme(el, mode){ document.querySelectorAll('.ob-theme').forEach(function(c){c.classList.remove('sel');}); el.classList.add('sel'); _obData.theme=mode; setTheme(mode); }
+function _obShow(step){
+  _obStep=step;
+  [1,2,3].forEach(function(n){ var el=document.getElementById('obStep'+n); if(el) el.classList.toggle('hidden', n!==step); });
+  var bar=document.getElementById('obBar'); if(bar) bar.style.width=Math.round(step*33.34)+'%';
+  var lb=document.getElementById('obStepLabel'); if(lb) lb.textContent=step+'/3';
+  var bk=document.getElementById('obBack'); if(bk) bk.style.visibility= step>1?'visible':'hidden';
+}
+function obNext(){
+  if(_obStep===1){ var v=(document.getElementById('obName').value||'').trim(); _obData.name=v||_obData.name||'Ami·e'; _obShow(2); }
+  else if(_obStep===2){ _obShow(3); }
+}
+function obPrev(){ if(_obStep>1) _obShow(_obStep-1); else showScreen('app'); }
+function obFinish(){
+  if(_session){
+    _session.firstName=_obData.name; _session.uses=_obData.uses; _session.roles=_obData.roles;
+    _session.onboarded=true; _saveSession(); _applySession();
+  }
+  try{ localStorage.setItem('sv_onboarded','1'); }catch(e){}
+  recordEvent('🎉','Bienvenue sur SignVoice','Configuration terminée');
+  showScreen('app'); showView('home');
 }
 
 document.addEventListener('DOMContentLoaded', function() {

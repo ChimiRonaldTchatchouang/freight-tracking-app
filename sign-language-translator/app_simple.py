@@ -747,26 +747,377 @@ textarea{resize:vertical;min-height:100px;grid-column:1/-1}
   .tab-btn{padding:.38rem .55rem;font-size:15px}
   header{gap:.5rem;padding:0 .85rem}
 }
+/* ══ SCREENS / AUTH / SHELL ══════════════════════════════ */
+.scr{min-height:100vh}
+.hidden{display:none !important}
+
+/* ── LANDING ── */
+.lp-nav{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;padding:.85rem 1.5rem;background:rgba(255,255,255,.85);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+.lp-nav .brand-name{color:var(--brand)}
+.lp-nav-links{display:flex;gap:1.4rem;align-items:center}
+.lp-nav-links a{font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;text-decoration:none}
+.lp-nav-links a:hover{color:var(--brand)}
+.lp-hero{max-width:1080px;margin:0 auto;padding:4rem 1.5rem 3rem;display:grid;grid-template-columns:1.1fr .9fr;gap:2.5rem;align-items:center}
+.lp-badge{display:inline-flex;align-items:center;gap:.4rem;background:#ecfdf5;color:#059669;font-size:11px;font-weight:800;padding:.3rem .7rem;border-radius:999px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:1.1rem}
+.lp-hero h1{font-size:52px;line-height:1.05;font-weight:900;letter-spacing:-.02em;margin-bottom:1rem}
+.lp-hero h1 .accent{color:var(--brand)}
+.lp-hero p.sub{font-size:16px;color:var(--muted);line-height:1.6;margin-bottom:1.6rem;max-width:34ch}
+.lp-cta{display:flex;gap:.8rem;flex-wrap:wrap}
+.btn-hero{padding:.85rem 1.5rem;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;border:none;display:inline-flex;align-items:center;gap:.5rem;transition:all .18s}
+.btn-hero.primary{background:linear-gradient(135deg,var(--brand),var(--accent));color:#fff;box-shadow:0 6px 20px rgba(79,70,229,.28)}
+.btn-hero.primary:hover{transform:translateY(-2px)}
+.btn-hero.ghost{background:#fff;color:var(--text);border:1.5px solid var(--border)}
+.btn-hero.ghost:hover{border-color:var(--brand);color:var(--brand)}
+.lp-visual{position:relative;border-radius:20px;background:linear-gradient(135deg,#eef2ff,#faf5ff);border:1px solid var(--border);padding:1.5rem;box-shadow:var(--sh2);text-align:center}
+.lp-visual .big{font-size:88px;line-height:1;margin:.5rem 0}
+.lp-visual .cap{font-size:13px;color:var(--muted);font-weight:600}
+.lp-pill-live{position:absolute;bottom:-14px;left:50%;transform:translateX(-50%);background:#fff;border:1px solid var(--border);border-radius:999px;padding:.4rem .9rem;font-size:11px;font-weight:800;color:#059669;box-shadow:var(--sh);display:flex;align-items:center;gap:.4rem;white-space:nowrap}
+.dot-live{width:8px;height:8px;border-radius:50%;background:#22c55e;animation:_pulse2 1.4s infinite}
+@keyframes _pulse2{0%,100%{opacity:1}50%{opacity:.35}}
+.lp-section{max-width:1080px;margin:0 auto;padding:2.5rem 1.5rem}
+.lp-section h2{text-align:center;font-size:30px;font-weight:900;letter-spacing:-.01em;margin-bottom:.4rem}
+.lp-section .s-sub{text-align:center;color:var(--muted);font-size:14px;margin-bottom:2rem}
+.feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
+.feat-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:1.3rem;box-shadow:var(--sh);transition:transform .18s}
+.feat-card:hover{transform:translateY(-3px)}
+.feat-ic{width:42px;height:42px;border-radius:11px;background:#eef2ff;display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:.8rem}
+.feat-card h3{font-size:15px;font-weight:800;margin-bottom:.35rem}
+.feat-card p{font-size:12.5px;color:var(--muted);line-height:1.55}
+.lp-foot{background:#0f172a;color:#cbd5e1;text-align:center;padding:2rem 1.5rem;margin-top:2rem;font-size:12px}
+.lp-foot .brand-name{color:#fff}
+
+/* ── AUTH ── */
+.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1.5rem;background:linear-gradient(135deg,#eef2ff,#f5f3ff)}
+.auth-card{display:grid;grid-template-columns:1fr 1fr;max-width:900px;width:100%;background:#fff;border-radius:20px;overflow:hidden;box-shadow:var(--sh2)}
+.auth-left{background:linear-gradient(160deg,var(--brand),var(--accent));color:#fff;padding:2.5rem 2rem;display:flex;flex-direction:column}
+.auth-left .brand-name{color:#fff;font-size:22px}
+.auth-left h2{font-size:26px;font-weight:900;line-height:1.15;margin:1.6rem 0 .8rem}
+.auth-left p{font-size:13.5px;color:rgba(255,255,255,.85);line-height:1.6}
+.auth-quote{margin-top:auto;font-size:12.5px;font-style:italic;color:rgba(255,255,255,.9);border-left:3px solid rgba(255,255,255,.4);padding-left:.8rem}
+.auth-right{padding:2.5rem 2.2rem}
+.auth-right h3{font-size:22px;font-weight:900;margin-bottom:.3rem}
+.auth-right .ar-sub{font-size:13px;color:var(--muted);margin-bottom:1.4rem}
+.oauth-row{display:flex;gap:.6rem;margin-bottom:1.1rem}
+.oauth-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:.5rem;padding:.7rem;border:1.5px solid var(--border);border-radius:10px;background:#fff;font-size:13px;font-weight:700;cursor:pointer;transition:all .15s}
+.oauth-btn:hover{border-color:var(--brand);background:#f8fafc}
+.oauth-g-svg{width:18px;height:18px}
+.auth-or{display:flex;align-items:center;gap:.7rem;color:#cbd5e1;font-size:10px;font-weight:800;letter-spacing:.1em;margin:1rem 0}
+.auth-or::before,.auth-or::after{content:"";flex:1;height:1px;background:var(--border)}
+.auth-field{margin-bottom:.9rem}
+.auth-field label{display:block;font-size:12px;font-weight:700;margin-bottom:.35rem;color:var(--text)}
+.auth-field input{width:100%;padding:.7rem .85rem;border:1.5px solid var(--border);border-radius:10px;font:inherit;font-size:14px;outline:none;transition:border-color .15s,box-shadow .15s}
+.auth-field input:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(79,70,229,.12)}
+.auth-submit{width:100%;padding:.85rem;border:none;border-radius:10px;background:linear-gradient(135deg,var(--brand),var(--accent));color:#fff;font-size:15px;font-weight:800;cursor:pointer;margin-top:.3rem;transition:filter .15s}
+.auth-submit:hover{filter:brightness(1.07)}
+.auth-alt{text-align:center;font-size:13px;color:var(--muted);margin-top:1.1rem}
+.auth-alt a{color:var(--brand);font-weight:700;cursor:pointer}
+.auth-note{font-size:11px;color:var(--muted);text-align:center;margin-top:.8rem;line-height:1.5}
+#gsiButton{display:flex;justify-content:center;margin-bottom:.6rem}
+
+/* ── APP SHELL ── */
+.app-top{position:sticky;top:0;z-index:60;display:flex;align-items:center;gap:1rem;padding:.6rem 1.25rem;background:#fff;border-bottom:1px solid var(--border);box-shadow:0 1px 8px rgba(0,0,0,.03)}
+.app-top .brand-name{color:var(--brand);font-size:16px}
+.app-top .brand-sub{color:var(--muted)}
+.app-nav{display:flex;gap:.25rem;flex:1;justify-content:center;flex-wrap:wrap}
+.anav{display:flex;align-items:center;gap:.4rem;padding:.5rem .85rem;border:none;background:transparent;border-radius:9px;font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;transition:all .15s}
+.anav:hover{background:#f1f5f9;color:var(--text)}
+.anav.active{background:#eef2ff;color:var(--brand)}
+.app-top-right{display:flex;align-items:center;gap:.7rem}
+.user-menu{position:relative;display:flex;align-items:center;gap:.5rem;cursor:pointer;padding:.25rem .5rem .25rem .25rem;border-radius:999px;border:1px solid var(--border)}
+.user-menu:hover{background:#f8fafc}
+.u-avatar{width:30px;height:30px;border-radius:50%;object-fit:cover;background:#e0e7ff;flex-shrink:0}
+.u-name{font-size:13px;font-weight:700;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.user-dropdown{position:absolute;top:calc(100% + 8px);right:0;width:230px;background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:var(--sh2);padding:.5rem;display:none;z-index:70}
+.user-dropdown.open{display:block}
+.ud-head{display:flex;gap:.6rem;align-items:center;padding:.5rem;border-bottom:1px solid var(--border);margin-bottom:.4rem}
+.ud-name{font-size:13px;font-weight:800}
+.ud-email{font-size:11px;color:var(--muted);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.user-dropdown button{width:100%;text-align:left;padding:.55rem .6rem;border:none;background:transparent;border-radius:8px;font-size:13px;font-weight:600;color:var(--text);cursor:pointer}
+.user-dropdown button:hover{background:#f1f5f9}
+.app-view{display:none}
+.app-view.active{display:block}
+.sub-tabs{display:flex;gap:.3rem;justify-content:center;padding:.9rem 1rem 0}
+
+/* ── DASHBOARD ── */
+.dash{max-width:1080px;margin:0 auto;padding:1.5rem 1.25rem 2.5rem}
+.dash-hello{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:1.4rem}
+.dash-hello h1{font-size:30px;font-weight:900;letter-spacing:-.01em}
+.dash-hello p{color:var(--muted);font-size:14px;margin-top:.2rem}
+.dash-hero{background:linear-gradient(135deg,var(--brand),var(--accent));border-radius:18px;color:#fff;padding:1.6rem;display:grid;grid-template-columns:1fr auto;gap:1rem;align-items:center;margin-bottom:1.5rem;box-shadow:0 10px 30px rgba(79,70,229,.25);position:relative;overflow:hidden}
+.dash-hero h2{font-size:24px;font-weight:900;margin:.4rem 0 .5rem}
+.dash-hero p{font-size:13.5px;color:rgba(255,255,255,.9);line-height:1.55;max-width:44ch}
+.dash-hero .badge-live{display:inline-flex;align-items:center;gap:.4rem;background:rgba(255,255,255,.18);padding:.25rem .7rem;border-radius:999px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em}
+.dash-hero .hero-cta{margin-top:1rem;display:inline-flex;align-items:center;gap:.5rem;background:#fff;color:var(--brand);border:none;padding:.7rem 1.3rem;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer}
+.dash-hero .hero-ic{width:110px;height:110px;border-radius:50%;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:52px}
+.qa-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem}
+.qa-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:1.2rem;cursor:pointer;box-shadow:var(--sh);transition:all .18s}
+.qa-card:hover{transform:translateY(-3px);border-color:#c7d2fe}
+.qa-ic{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:.7rem}
+.qa-card h3{font-size:15px;font-weight:800;margin-bottom:.25rem}
+.qa-card p{font-size:12px;color:var(--muted);line-height:1.5}
+.dash-cols{display:grid;grid-template-columns:1.4fr 1fr;gap:1rem}
+.dash-panel{background:#fff;border:1px solid var(--border);border-radius:14px;padding:1.2rem;box-shadow:var(--sh)}
+.dash-panel h3{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:.9rem;display:flex;justify-content:space-between;align-items:center}
+.stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:.8rem}
+.stat-tile{text-align:center;padding:.6rem;background:#f8fafc;border-radius:11px;border:1px solid var(--border)}
+.stat-v{font-size:26px;font-weight:900;color:var(--brand)}
+.stat-l{font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700;letter-spacing:.04em;margin-top:2px}
+.activity-item{display:flex;gap:.7rem;align-items:center;padding:.6rem 0;border-bottom:1px solid var(--border)}
+.activity-item:last-child{border-bottom:none}
+.ai-ic{width:34px;height:34px;border-radius:9px;background:#eef2ff;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.ai-txt{flex:1;min-width:0}
+.ai-t{font-size:13px;font-weight:700}
+.ai-s{font-size:11px;color:var(--muted)}
+.ai-time{font-size:11px;color:#cbd5e1;font-weight:600}
+.empty-hint{text-align:center;color:#cbd5e1;font-size:13px;padding:1.5rem 1rem}
+
+/* ── HISTORY ── */
+.page-wrap{max-width:820px;margin:0 auto;padding:1.5rem 1.25rem 2.5rem}
+.page-wrap h1{font-size:26px;font-weight:900;margin-bottom:.3rem}
+.page-wrap .p-sub{color:var(--muted);font-size:14px;margin-bottom:1.4rem}
+.hist-item{display:flex;gap:.9rem;align-items:center;background:#fff;border:1px solid var(--border);border-radius:12px;padding:.9rem 1rem;margin-bottom:.6rem;box-shadow:var(--sh)}
+.hist-ic{width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.hist-main{flex:1;min-width:0}
+.hist-t{font-size:14px;font-weight:800}
+.hist-d{font-size:12px;color:var(--muted);margin-top:2px}
+.hist-time{font-size:11px;color:#94a3b8;font-weight:600;text-align:right;flex-shrink:0}
+
+/* ── SETTINGS ── */
+.set-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:1.3rem;margin-bottom:1rem;box-shadow:var(--sh)}
+.set-card h3{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:1rem}
+.set-profile{display:flex;gap:1rem;align-items:center}
+.set-profile img{width:56px;height:56px;border-radius:50%;object-fit:cover;background:#e0e7ff}
+.set-profile .sp-name{font-size:17px;font-weight:800}
+.set-profile .sp-email{font-size:13px;color:var(--muted)}
+.set-row{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.7rem 0;border-bottom:1px solid var(--border)}
+.set-row:last-child{border-bottom:none}
+.set-row .sr-l{font-size:13.5px;font-weight:600}
+.set-row .sr-d{font-size:11.5px;color:var(--muted)}
+.set-row select{max-width:220px}
+.btn-danger{padding:.7rem 1.2rem;border:1.5px solid #fecaca;background:#fef2f2;color:#dc2626;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer}
+.btn-danger:hover{background:#fee2e2}
+
+@media(max-width:820px){
+  .lp-hero{grid-template-columns:1fr;text-align:center}
+  .lp-hero h1{font-size:38px}
+  .lp-hero p.sub{margin-left:auto;margin-right:auto}
+  .lp-cta{justify-content:center}
+  .feat-grid{grid-template-columns:1fr}
+  .auth-card{grid-template-columns:1fr;max-width:440px}
+  .auth-left{display:none}
+  .qa-grid{grid-template-columns:1fr}
+  .dash-cols{grid-template-columns:1fr}
+  .dash-hero{grid-template-columns:1fr}
+  .dash-hero .hero-ic{display:none}
+  .app-nav .anav span{display:none}
+  .lp-nav-links a:not(.btn-hero){display:none}
+}
 </style>
 </head>
 <body>
 
 <!-- ══ HEADER ══════════════════════════════════════════════════ -->
-<header>
+<!-- ══════════════════════════ LANDING ══════════════════════════ -->
+<div id="scr-landing" class="scr">
+  <div class="lp-nav">
+    <div class="brand"><span class="brand-icon">🤟</span><div class="brand-name">SignVoice</div></div>
+    <div class="lp-nav-links">
+      <a onclick="document.getElementById('lp-features').scrollIntoView({behavior:'smooth'})">Fonctionnalités</a>
+      <a onclick="document.getElementById('lp-how').scrollIntoView({behavior:'smooth'})">Comment ça marche</a>
+      <a class="btn-hero primary" style="padding:.5rem 1.1rem;font-size:13px" onclick="goAuth('signin')">Commencer</a>
+    </div>
+  </div>
+
+  <div class="lp-hero">
+    <div>
+      <span class="lp-badge">✦ Accessibilité augmentée par l'IA</span>
+      <h1>Communiquer <span class="accent">au-delà</span> des barrières</h1>
+      <p class="sub">Interprétation de la langue des signes en temps réel, propulsée par l'IA. Traduisez gestes ↔ parole instantanément, où que vous soyez.</p>
+      <div class="lp-cta">
+        <button class="btn-hero primary" onclick="goAuth('signup')">Démarrer gratuitement →</button>
+        <button class="btn-hero ghost" onclick="goAuth('signin')">▷ Se connecter</button>
+      </div>
+    </div>
+    <div class="lp-visual">
+      <div class="big">🤟</div>
+      <div class="cap">Reconnaissance LSF en direct</div>
+      <div class="lp-pill-live"><span class="dot-live"></span> Interprétation active</div>
+    </div>
+  </div>
+
+  <div class="lp-section" id="lp-features">
+    <h2>Une traduction fluide</h2>
+    <p class="s-sub">Propulsée par des réseaux neuronaux modernes et un design centré sur l'humain.</p>
+    <div class="feat-grid">
+      <div class="feat-card"><div class="feat-ic">⚡</div><h3>IA temps réel</h3><p>Moteur de reconnaissance des gestes à faible latence. Pas d'attente, juste la conversation.</p></div>
+      <div class="feat-card"><div class="feat-ic">🖐️</div><h3>Signe → Texte / Voix</h3><p>Reconnaît la forme des mains, le mouvement et la direction, puis les convertit en texte clair ou en voix.</p></div>
+      <div class="feat-card"><div class="feat-ic">🎙️</div><h3>Voix → Texte</h3><p>La personne entendante parle, le texte s'affiche instantanément pour la personne sourde.</p></div>
+      <div class="feat-card"><div class="feat-ic">📚</div><h3>Apprentissage de signes</h3><p>Enrichissez le dictionnaire : capturez un geste et associez-lui une signification.</p></div>
+      <div class="feat-card"><div class="feat-ic">🔒</div><h3>Respect de la vie privée</h3><p>La reconnaissance tourne dans votre navigateur. Vos conversations restent chez vous.</p></div>
+      <div class="feat-card"><div class="feat-ic">📱</div><h3>PWA multi-plateforme</h3><p>Installable sur téléphone, tablette et ordinateur. Fonctionne partout.</p></div>
+    </div>
+  </div>
+
+  <div class="lp-section" id="lp-how">
+    <h2>Conçu pour la dignité</h2>
+    <p class="s-sub">Du monde réel — des réunions professionnelles aux moments en famille.</p>
+    <div class="feat-grid">
+      <div class="feat-card"><div class="feat-ic">1️⃣</div><h3>Créez un compte</h3><p>Connexion rapide avec Google ou par email, en quelques secondes.</p></div>
+      <div class="feat-card"><div class="feat-ic">2️⃣</div><h3>Lancez l'interprétation</h3><p>Activez la caméra, montrez vos signes — la traduction apparaît en direct.</p></div>
+      <div class="feat-card"><div class="feat-ic">3️⃣</div><h3>Dialoguez</h3><p>Communication bidirectionnelle : signes ↔ parole, avec historique horodaté.</p></div>
+    </div>
+    <div style="text-align:center;margin-top:2rem">
+      <button class="btn-hero primary" onclick="goAuth('signup')">Prêt à briser le silence ? →</button>
+    </div>
+  </div>
+
+  <div class="lp-foot">
+    <div class="brand-name" style="font-size:18px;font-weight:900;margin-bottom:.4rem">SignVoice</div>
+    L'accessibilité par l'innovation. © 2026 SignVoice — construit avec empathie.
+  </div>
+</div>
+
+<!-- ══════════════════════════ AUTH ══════════════════════════ -->
+<div id="scr-auth" class="scr hidden">
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <div class="auth-left">
+        <div class="brand"><span class="brand-icon">🤟</span><div class="brand-name">SignVoice</div></div>
+        <h2>Briser les barrières par l'innovation.</h2>
+        <p>Rejoignez une communauté et vivez l'interprétation de la langue des signes en temps réel, propulsée par une IA de pointe.</p>
+        <div class="auth-quote">« SignVoice a complètement changé ma façon d'interagir avec mes collègues. Vraiment accessible. »</div>
+      </div>
+      <div class="auth-right">
+        <h3 id="authTitle">Bon retour</h3>
+        <p class="ar-sub" id="authSub">Entrez vos informations pour vous connecter.</p>
+
+        <div id="gsiButton"></div>
+        <button class="oauth-btn" id="googleFallbackBtn" onclick="googleDemoSignIn()" style="width:100%;margin-bottom:.6rem">
+          <svg class="oauth-g-svg" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+          Continuer avec Google
+        </button>
+
+        <div class="auth-or">OU EMAIL</div>
+
+        <div class="auth-field">
+          <label>Adresse email</label>
+          <input id="authEmail" type="email" placeholder="nom@exemple.com" autocomplete="email">
+        </div>
+        <div class="auth-field" id="authNameField" style="display:none">
+          <label>Nom complet</label>
+          <input id="authName" type="text" placeholder="Votre nom" autocomplete="name">
+        </div>
+        <div class="auth-field">
+          <label>Mot de passe</label>
+          <input id="authPass" type="password" placeholder="••••••••" autocomplete="current-password">
+        </div>
+        <button class="auth-submit" id="authSubmitBtn" onclick="authSubmit()">Se connecter →</button>
+
+        <div class="auth-alt" id="authAltLine">
+          Pas encore de compte ? <a onclick="toggleAuthMode()">Créer un compte</a>
+        </div>
+        <div class="auth-note" id="authNote"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════ APP ══════════════════════════ -->
+<div id="scr-app" class="hidden">
+<header class="app-top">
   <div class="brand">
     <span class="brand-icon">🤟</span>
     <div>
-      <div class="brand-name">SignVoix</div>
-      <div class="brand-sub">Traducteur LSF temps réel</div>
+      <div class="brand-name">SignVoice</div>
+      <div class="brand-sub">Interprète LSF</div>
     </div>
   </div>
-  <div class="tabs">
+  <nav class="app-nav">
+    <button class="anav active" data-view="home"      onclick="showView('home',this)">🏠<span>Accueil</span></button>
+    <button class="anav"        data-view="interpret" onclick="showView('interpret',this)">🎥<span>Interprétation</span></button>
+    <button class="anav"        data-view="history"   onclick="showView('history',this)">🕘<span>Historique</span></button>
+    <button class="anav"        data-view="settings"  onclick="showView('settings',this)">⚙<span>Réglages</span></button>
+  </nav>
+  <div class="app-top-right">
+    <div class="mp-pill loading" id="mpPill">⏳ …</div>
+    <div class="user-menu" onclick="toggleUserMenu(event)">
+      <img id="uAvatar" class="u-avatar" alt="">
+      <span id="uName" class="u-name">—</span>
+      <div class="user-dropdown" id="userDropdown">
+        <div class="ud-head"><img id="udAvatar" class="u-avatar" alt=""><div><div id="udName" class="ud-name"></div><div id="udEmail" class="ud-email"></div></div></div>
+        <button onclick="showView('settings')">⚙ Réglages</button>
+        <button onclick="signOut()">↩ Déconnexion</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ── VIEW : ACCUEIL / DASHBOARD ── -->
+<div id="view-home" class="app-view active">
+  <div class="dash">
+    <div class="dash-hello">
+      <div>
+        <h1 id="dashGreeting">Bonjour 👋</h1>
+        <p>Prêt·e pour votre prochaine session d'interprétation ?</p>
+      </div>
+      <button class="btn-hero primary" onclick="showView('interpret')">+ Nouvelle session</button>
+    </div>
+
+    <div class="dash-hero">
+      <div>
+        <span class="badge-live"><span class="dot-live"></span> IA prête</span>
+        <h2>Interprétation en temps réel</h2>
+        <p>Activez la caméra et montrez vos signes LSF — la traduction apparaît instantanément, avec lecture vocale et dialogue bidirectionnel.</p>
+        <button class="hero-cta" onclick="showView('interpret')">🎥 Démarrer l'interprétation</button>
+      </div>
+      <div class="hero-ic">🤟</div>
+    </div>
+
+    <div class="qa-grid">
+      <div class="qa-card" onclick="showView('interpret'); setTimeout(function(){switchTabByName('cam')},50)">
+        <div class="qa-ic" style="background:#eef2ff">📷</div>
+        <h3>Caméra → Signes</h3>
+        <p>Reconnaissance LSF en direct et lecture vocale de la phrase.</p>
+      </div>
+      <div class="qa-card" onclick="showView('interpret'); setTimeout(function(){switchTabByName('talk')},50)">
+        <div class="qa-ic" style="background:#ecfdf5">💬</div>
+        <h3>Dialogue bidirectionnel</h3>
+        <p>La personne entendante parle, le texte s'affiche pour la personne sourde.</p>
+      </div>
+      <div class="qa-card" onclick="showView('interpret'); setTimeout(function(){switchTabByName('text')},50)">
+        <div class="qa-ic" style="background:#fef3c7">📝</div>
+        <h3>Texte → LSF</h3>
+        <p>Traduisez un texte français en gloses de langue des signes.</p>
+      </div>
+    </div>
+
+    <div class="dash-cols">
+      <div class="dash-panel">
+        <h3>Activité récente <a style="font-size:11px;color:var(--brand);cursor:pointer;font-weight:700" onclick="showView('history')">Tout voir</a></h3>
+        <div id="dashActivity"></div>
+      </div>
+      <div class="dash-panel">
+        <h3>Vos statistiques</h3>
+        <div class="stat-row">
+          <div class="stat-tile"><div class="stat-v" id="statSessions">0</div><div class="stat-l">Sessions</div></div>
+          <div class="stat-tile"><div class="stat-v" id="statSigns">0</div><div class="stat-l">Signes appris</div></div>
+          <div class="stat-tile"><div class="stat-v" id="statPhrases">0</div><div class="stat-l">Phrases</div></div>
+        </div>
+        <div style="margin-top:1rem;font-size:12px;color:var(--muted);line-height:1.6">
+          💡 Astuce : maintenez un signe <strong>1 s</strong> pour l'ajouter à la phrase, puis laissez l'IA la lire à voix haute.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── VIEW : INTERPRÉTATION (traducteur existant) ── -->
+<div id="view-interpret" class="app-view">
+  <div class="sub-tabs">
     <button class="tab-btn active" onclick="switchTab('cam',this)">📷<span class="tlab"> Caméra</span></button>
     <button class="tab-btn"        onclick="switchTab('talk',this)">💬<span class="tlab"> Dialogue</span></button>
     <button class="tab-btn"        onclick="switchTab('text',this)">📝<span class="tlab"> Texte</span></button>
   </div>
-  <div class="mp-pill loading" id="mpPill">⏳ …</div>
-</header>
 
 <main>
 
@@ -1012,6 +1363,73 @@ textarea{resize:vertical;min-height:100px;grid-column:1/-1}
   </div>
 </div>
 
+</div><!-- /view-interpret -->
+
+<!-- ── VIEW : HISTORIQUE ── -->
+<div id="view-history" class="app-view">
+  <div class="page-wrap">
+    <h1>Historique</h1>
+    <p class="p-sub">Vos sessions d'interprétation et phrases traduites.</p>
+    <div id="historyList"></div>
+  </div>
+</div>
+
+<!-- ── VIEW : RÉGLAGES ── -->
+<div id="view-settings" class="app-view">
+  <div class="page-wrap">
+    <h1>Réglages</h1>
+    <p class="p-sub">Gérez votre profil et vos préférences.</p>
+
+    <div class="set-card">
+      <h3>Profil</h3>
+      <div class="set-profile">
+        <img id="setAvatar" alt="">
+        <div>
+          <div class="sp-name" id="setName">—</div>
+          <div class="sp-email" id="setEmail">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="set-card">
+      <h3>Communication</h3>
+      <div class="set-row">
+        <div><div class="sr-l">Mon statut / celui de l'autre</div><div class="sr-d">Adapte l'interface du Dialogue</div></div>
+        <button class="btn-hero ghost" style="padding:.5rem 1rem;font-size:13px" onclick="showView('interpret');setTimeout(function(){switchTabByName('talk');openStatusModal()},60)">Configurer</button>
+      </div>
+      <div class="set-row">
+        <div><div class="sr-l">Vitesse de lecture vocale</div><div class="sr-d">Débit de la synthèse vocale</div></div>
+        <select id="setRate" onchange="_setTtsRate(this.value)">
+          <option value="0.75">Lente</option>
+          <option value="0.9" selected>Normale</option>
+          <option value="1.1">Rapide</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="set-card">
+      <h3>Application</h3>
+      <div class="set-row">
+        <div><div class="sr-l">Signes appris</div><div class="sr-d" id="setSignsCount">0 signe(s) enregistré(s)</div></div>
+        <button class="btn-hero ghost" style="padding:.5rem 1rem;font-size:13px" onclick="showView('interpret');setTimeout(function(){switchTabByName('cam')},50)">Gérer</button>
+      </div>
+      <div class="set-row">
+        <div><div class="sr-l">Effacer l'historique</div><div class="sr-d">Supprime les sessions enregistrées localement</div></div>
+        <button class="btn-hero ghost" style="padding:.5rem 1rem;font-size:13px" onclick="clearHistory()">Effacer</button>
+      </div>
+    </div>
+
+    <div class="set-card">
+      <h3>Compte</h3>
+      <div class="set-row">
+        <div><div class="sr-l">Déconnexion</div><div class="sr-d">Vous reviendrez à l'écran de connexion</div></div>
+        <button class="btn-danger" onclick="signOut()">Se déconnecter</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /scr-app -->
 <script>
 /* ── TABS ──────────────────────────────────────────────── */
 function switchTab(name, btn) {
@@ -1155,6 +1573,171 @@ window.addEventListener('unhandledrejection', function(e) {
   }
 });
 
+/* ══════════════ AUTH · ROUTER · DASHBOARD ══════════════ */
+var _session = null, _googleClientId = '', _authMode = 'signin', _ttsRate = 0.9;
+
+function _loadSession(){ try{ var r=localStorage.getItem('sv_session'); if(r) _session=JSON.parse(r); }catch(e){ _session=null; } }
+function _saveSession(){ try{ localStorage.setItem('sv_session', JSON.stringify(_session)); }catch(e){} }
+
+function showScreen(name){
+  ['landing','auth','app'].forEach(function(s){ var el=document.getElementById('scr-'+s); if(el) el.classList.toggle('hidden', s!==name); });
+  window.scrollTo(0,0);
+}
+function goAuth(mode){ showScreen('auth'); _setAuthMode(mode==='signup'?'signup':'signin'); }
+
+function _setAuthMode(m){
+  _authMode=m;
+  document.getElementById('authTitle').textContent = m==='signup'?'Créer un compte':'Bon retour';
+  document.getElementById('authSub').textContent  = m==='signup'?'Rejoignez SignVoice en quelques secondes.':'Entrez vos informations pour vous connecter.';
+  document.getElementById('authNameField').style.display = m==='signup'?'block':'none';
+  document.getElementById('authSubmitBtn').textContent = m==='signup'?'Créer mon compte →':'Se connecter →';
+  document.getElementById('authAltLine').innerHTML = m==='signup'
+    ? 'Déjà un compte ? <a onclick="toggleAuthMode()">Se connecter</a>'
+    : 'Pas encore de compte ? <a onclick="toggleAuthMode()">Créer un compte</a>';
+  document.getElementById('authNote').textContent='';
+}
+function toggleAuthMode(){ _setAuthMode(_authMode==='signup'?'signin':'signup'); }
+
+function authSubmit(){
+  var email=(document.getElementById('authEmail').value||'').trim();
+  var name=(document.getElementById('authName').value||'').trim();
+  var pass=(document.getElementById('authPass').value||'').trim();
+  var note=document.getElementById('authNote');
+  if(email.indexOf('@')<1){ note.textContent='Entrez une adresse email valide.'; document.getElementById('authEmail').focus(); return; }
+  if(pass.length<4){ note.textContent='Le mot de passe doit contenir au moins 4 caractères.'; document.getElementById('authPass').focus(); return; }
+  if(_authMode==='signup' && !name){ note.textContent='Entrez votre nom.'; document.getElementById('authName').focus(); return; }
+  _completeLogin({ name: name || email.split('@')[0], email: email, picture:'', provider:'email' });
+}
+
+function googleDemoSignIn(){
+  _completeLogin({ name:'Utilisateur Google', email:'demo@signvoice.app', picture:'', provider:'google-demo' });
+}
+
+function _decodeJwt(t){ try{ var p=t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'); return JSON.parse(decodeURIComponent(escape(atob(p)))); }catch(e){ return null; } }
+function _onGoogleCredential(resp){
+  var d=_decodeJwt(resp.credential);
+  if(!d){ appLog('warn','Jeton Google invalide'); return; }
+  _completeLogin({ name:d.name||d.email, email:d.email, picture:d.picture||'', provider:'google' });
+}
+
+function _completeLogin(user){
+  user.since = Date.now();
+  _session = user; _saveSession();
+  _applySession();
+  showScreen('app'); showView('home');
+  recordEvent('🔑', 'Connexion', user.email);
+  appLog('ok','Connecté : '+user.email+' ('+user.provider+')');
+}
+
+function _avatarFor(u){
+  if(u && u.picture) return u.picture;
+  var initial=((u&&(u.name||u.email))||'?').trim().charAt(0).toUpperCase();
+  var svg='<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" rx="32" fill="#4f46e5"/><text x="50%" y="54%" font-size="30" fill="#fff" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-weight="700">'+initial+'</text></svg>';
+  return 'data:image/svg+xml;utf8,'+encodeURIComponent(svg);
+}
+
+function _applySession(){
+  if(!_session) return;
+  var av=_avatarFor(_session);
+  ['uAvatar','udAvatar','setAvatar'].forEach(function(id){ var e=document.getElementById(id); if(e) e.src=av; });
+  var set=function(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; };
+  set('uName',_session.name); set('udName',_session.name); set('udEmail',_session.email);
+  set('setName',_session.name); set('setEmail',_session.email);
+  var hr=new Date().getHours(), greet=hr<12?'Bonjour':hr<18?'Bon après-midi':'Bonsoir';
+  set('dashGreeting', greet+', '+String(_session.name).split(' ')[0]+' 👋');
+  _refreshDash();
+}
+
+function signOut(){
+  _session=null; try{ localStorage.removeItem('sv_session'); }catch(e){}
+  closeUserMenu(); showScreen('landing'); appLog('info','Déconnexion');
+}
+
+function toggleUserMenu(ev){ if(ev) ev.stopPropagation(); var d=document.getElementById('userDropdown'); if(d) d.classList.toggle('open'); }
+function closeUserMenu(){ var d=document.getElementById('userDropdown'); if(d) d.classList.remove('open'); }
+document.addEventListener('click', function(){ closeUserMenu(); });
+
+function showView(name, btn){
+  ['home','interpret','history','settings'].forEach(function(v){ var el=document.getElementById('view-'+v); if(el) el.classList.toggle('active', v===name); });
+  document.querySelectorAll('.anav').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-view')===name); });
+  window.scrollTo(0,0); closeUserMenu();
+  if(name==='history') _renderHistory();
+  if(name==='home') _refreshDash();
+  if(name==='settings') _refreshSettings();
+}
+function switchTabByName(n){ var b=document.querySelector('.sub-tabs .tab-btn[onclick*="\'"+n+"\'"]'); if(b) switchTab(n,b); }
+
+/* Historique */
+function _loadHistoryArr(){ try{ var r=localStorage.getItem('sv_history'); return r?JSON.parse(r):[]; }catch(e){ return []; } }
+function _saveHistoryArr(a){ try{ localStorage.setItem('sv_history', JSON.stringify(a.slice(-100))); }catch(e){} }
+function recordEvent(icon,title,detail){ var a=_loadHistoryArr(); a.push({t:Date.now(),icon:icon,title:title,detail:detail||''}); _saveHistoryArr(a); }
+function _escHtml(s){ return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function _fmtWhen(ms){
+  var d=new Date(ms), diff=(Date.now()-ms)/1000; function p(n){return(n<10?'0':'')+n;}
+  if(diff<60) return "à l'instant";
+  if(diff<3600) return Math.floor(diff/60)+' min';
+  if(diff<86400) return Math.floor(diff/3600)+' h';
+  return p(d.getDate())+'/'+p(d.getMonth()+1)+' '+p(d.getHours())+':'+p(d.getMinutes());
+}
+function _renderHistory(){
+  var el=document.getElementById('historyList'); if(!el) return;
+  var a=_loadHistoryArr().slice().reverse();
+  if(!a.length){ el.innerHTML='<div class="empty-hint">Aucune activité pour le moment. Lancez une interprétation !</div>'; return; }
+  el.innerHTML=a.map(function(x){
+    return '<div class="hist-item"><div class="hist-ic" style="background:#eef2ff">'+(x.icon||'•')+'</div>'
+      +'<div class="hist-main"><div class="hist-t">'+_escHtml(x.title)+'</div><div class="hist-d">'+_escHtml(x.detail||'')+'</div></div>'
+      +'<div class="hist-time">'+_fmtWhen(x.t)+'</div></div>';
+  }).join('');
+}
+function clearHistory(){ _saveHistoryArr([]); _renderHistory(); _refreshDash(); appLog('info','Historique effacé'); }
+
+/* Dashboard + Settings */
+function _refreshDash(){
+  var hist=_loadHistoryArr();
+  var sessions=hist.filter(function(x){return x.icon==='🎥';}).length;
+  var phrases=hist.filter(function(x){return x.icon==='🔊'||x.icon==='🎙️';}).length;
+  var signs=(typeof LEARNED_SIGNS!=='undefined'&&LEARNED_SIGNS)?LEARNED_SIGNS.length:0;
+  var e;
+  if(e=document.getElementById('statSessions')) e.textContent=sessions;
+  if(e=document.getElementById('statPhrases')) e.textContent=phrases;
+  if(e=document.getElementById('statSigns')) e.textContent=signs;
+  var act=document.getElementById('dashActivity');
+  if(act){
+    var recent=hist.slice().reverse().slice(0,5);
+    act.innerHTML = recent.length ? recent.map(function(x){
+      return '<div class="activity-item"><div class="ai-ic">'+(x.icon||'•')+'</div><div class="ai-txt"><div class="ai-t">'+_escHtml(x.title)+'</div><div class="ai-s">'+_escHtml(x.detail||'')+'</div></div><div class="ai-time">'+_fmtWhen(x.t)+'</div></div>';
+    }).join('') : '<div class="empty-hint">Vos actions apparaîtront ici.</div>';
+  }
+}
+function _refreshSettings(){
+  var e=document.getElementById('setSignsCount');
+  if(e){ var n=(typeof LEARNED_SIGNS!=='undefined'&&LEARNED_SIGNS)?LEARNED_SIGNS.length:0; e.textContent=n+' signe(s) enregistré(s)'; }
+}
+function _setTtsRate(v){ _ttsRate=parseFloat(v)||0.9; }
+
+/* Google Identity Services */
+async function _initGoogleAuth(){
+  try{
+    var cfg = await fetch('/auth/config').then(function(r){return r.json();}).catch(function(){return {};});
+    _googleClientId = (cfg && cfg.googleClientId) || '';
+    if(!_googleClientId) return;               // pas de client ID → bouton démo conservé
+    await _loadScript('https://accounts.google.com/gsi/client');
+    if(!(window.google && google.accounts && google.accounts.id)) return;
+    google.accounts.id.initialize({ client_id:_googleClientId, callback:_onGoogleCredential });
+    var host=document.getElementById('gsiButton');
+    if(host) google.accounts.id.renderButton(host,{theme:'outline',size:'large',width:320,text:'continue_with',locale:'fr'});
+    var fb=document.getElementById('googleFallbackBtn'); if(fb) fb.style.display='none';
+    appLog('ok','Google Sign-In configuré ✓');
+  }catch(e){ appLog('info','Google Sign-In non configuré — bouton de démonstration actif'); }
+}
+
+function _bootAuth(){
+  _loadSession();
+  _initGoogleAuth();
+  if(_session){ _applySession(); showScreen('app'); showView('home'); }
+  else { showScreen('landing'); }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
   appLog('info', 'App initialisée');
   appLog('info', 'Navigateur: ' + navigator.userAgent.substring(0, 120));
@@ -1172,6 +1755,7 @@ document.addEventListener('DOMContentLoaded', function() {
   _renderConvAll();
   _initSR();
   _registerSW();
+  _bootAuth();  // Landing / connexion / application selon la session
 });
 
 /* ── LEARNING SERVICE ────────────────────────────────── */
@@ -1249,6 +1833,7 @@ function saveLearnedSign() {
   if (idx >= 0) { LEARNED_SIGNS[idx] = sign; appLog('ok', '✏️ Signe «' + fr + '» mis à jour'); }
   else          { LEARNED_SIGNS.push(sign);  appLog('ok', '✅ Signe «' + fr + '» appris — total: ' + LEARNED_SIGNS.length); }
   _saveLearnedSigns();
+  if (typeof recordEvent === 'function') recordEvent('📚', 'Nouveau signe appris', fr);
   cancelLearn();
   buildRefGrid();
 }
@@ -1790,6 +2375,7 @@ async function startCam() {
   if (!_drawUtils) { try { _drawUtils = new _TV.DrawingUtils(ctx); } catch(_) { _drawUtils = null; } }
 
   appLog('ok', '── Détection démarrée — ' + SIGNS.length + ' signes unimanuel + ' + BIMANUAL_SIGNS.length + ' signes bimanuel ──');
+  if (typeof recordEvent === 'function') recordEvent('🎥', 'Session d\'interprétation', 'Caméra LSF activée');
   running = true; _errCount = 0; _rejectCount = 0; _gotResult = false; _sendCount = 0; _resultCount = 0;
   var lastTs = 0, _lastVideoTime = -1;
   var FRAME_MS = 1000 / 20;
@@ -2052,7 +2638,7 @@ function speakFR(text) {
   if (!window.speechSynthesis || !text) return;
   speechSynthesis.cancel();
   var u = new SpeechSynthesisUtterance(text);
-  u.lang = 'fr-FR'; u.rate = 0.9; u.pitch = 1; u.volume = 1;
+  u.lang = 'fr-FR'; u.rate = (typeof _ttsRate === 'number' ? _ttsRate : 0.9); u.pitch = 1; u.volume = 1;
   if (_ttsVoice) u.voice = _ttsVoice;
   u.onerror = function(e) { appLog('warn', 'TTS erreur: ' + e.error); };
   speechSynthesis.speak(u);
@@ -2066,6 +2652,7 @@ function speakSentence() {
   appLog('info', '🔊 Lecture : «' + txt + '»' + (exact ? ' (phrase naturelle)' : ''));
   speakFR(txt);
   addConv('me', 'sign', txt);
+  if (typeof recordEvent === 'function') recordEvent('🔊', 'Phrase lue à voix haute', txt);
 }
 
 /* ══ DIALOGUE BIDIRECTIONNEL ═══════════════════════════════
@@ -2253,6 +2840,7 @@ function addConv(who, kind, text) {
   if (CONV.length > 100) CONV.shift();
   _saveConv();
   _appendConvBubble(entry);
+  if (kind === 'speech' && typeof recordEvent === 'function') recordEvent('🎙️', 'Parole transcrite', text);
   // Si l'autre a parlé et que JE n'entends pas, le texte s'affiche (déjà) ;
   // si l'autre a parlé et que JE peux entendre, pas besoin. Rien à vocaliser.
 }
@@ -2406,6 +2994,13 @@ document.addEventListener('DOMContentLoaded', function() {
 def index():
     _ensure_download_started()
     return render_template_string(HTML)
+
+@app.route('/auth/config')
+def auth_config():
+    # Client ID Google OAuth (public). Défini via la variable d'environnement
+    # GOOGLE_CLIENT_ID pour activer la vraie connexion Google ; sinon le bouton
+    # de démonstration reste actif côté client.
+    return jsonify({'googleClientId': os.environ.get('GOOGLE_CLIENT_ID', '')})
 
 # ── PWA : manifest + service worker (installable / cache hors-ligne) ──
 _MANIFEST = {

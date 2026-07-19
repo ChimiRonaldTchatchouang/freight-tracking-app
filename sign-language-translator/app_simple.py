@@ -956,6 +956,18 @@ textarea{resize:vertical;min-height:100px;grid-column:1/-1}
 .bubble .bticks{font-size:11px;opacity:.75;margin-left:.3rem}
 .bubble img.bimg{max-width:200px;border-radius:9px;margin-top:.3rem;display:block;cursor:pointer}
 .bubble .bvoice{display:flex;align-items:center;gap:.4rem;font-size:13px;margin-top:.2rem;cursor:pointer;opacity:.85}
+/* caméra dans le chat */
+.chat-cam{flex-shrink:0;border-top:1px solid var(--border);background:#0d0f16}
+.cc-video{position:relative;width:100%;background:#0d0f16;aspect-ratio:4/3;max-height:300px;overflow:hidden}
+.cc-video video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+.cc-video canvas{position:absolute;inset:0;width:100%;height:100%;transform:scaleX(-1)}
+.cc-btn{position:absolute;top:8px;background:rgba(0,0,0,.55);color:#fff;border:none;width:34px;height:34px;border-radius:50%;font-size:15px;cursor:pointer;z-index:3;display:flex;align-items:center;justify-content:center}
+.cc-close{right:8px}
+.cc-switch{right:50px}
+.cc-live{position:absolute;left:8px;bottom:8px;background:rgba(0,0,0,.6);color:#fff;padding:.3rem .7rem;border-radius:8px;font-size:15px;font-weight:800;z-index:3}
+.cc-bar{display:flex;align-items:center;gap:.5rem;padding:.5rem .7rem;background:var(--card)}
+.cc-phrase{flex:1;font-size:13px;font-weight:700;color:var(--brand);min-height:1.2em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cc-send{background:linear-gradient(135deg,var(--brand),var(--accent));color:#fff;border:none;padding:.5rem .9rem;border-radius:9px;font-size:13px;font-weight:800;cursor:pointer;flex-shrink:0}
 
 /* ══ DIALOGUE / SESSION ══════════════════════════════════ */
 .role-grid{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
@@ -1552,6 +1564,21 @@ body.dark .ai-ic,body.dark .hist-ic,body.dark .feat-ic,body.dark .qa-ic{filter:b
           <div class="conv-empty" id="convEmpty">Les messages apparaîtront ici. 👋</div>
         </div>
 
+        <!-- Caméra intégrée au chat (capture des signes en direct) -->
+        <div class="chat-cam" id="chatCamPanel" style="display:none">
+          <div class="cc-video">
+            <video id="chatVid" autoplay muted playsinline></video>
+            <canvas id="chatCvs"></canvas>
+            <button class="cc-btn cc-close" onclick="_chatCamStop()" title="Fermer">✕</button>
+            <button class="cc-btn cc-switch" id="ccSwitch" onclick="switchCameraChat()" title="Changer de caméra">🔄</button>
+            <div class="cc-live" id="chatCamLive">…</div>
+          </div>
+          <div class="cc-bar">
+            <span class="cc-phrase" id="chatCamPhrase">Maintenez un signe 1 s pour l'ajouter</span>
+            <button class="cc-send" id="ccSend" onclick="_chatCamSend()">Envoyer ➤</button>
+          </div>
+        </div>
+
         <!-- Zone de saisie (toutes les actions restent ici) -->
         <div class="chat-input">
           <button class="ci-btn" onclick="chatAttach()" title="Photo" aria-label="Joindre une photo">📎</button>
@@ -2085,7 +2112,14 @@ function showView(name, btn){
   if(name==='settings') _refreshSettings();
   if(name==='profile') _refreshProfile();
 }
-function switchTabByName(n){ var b=document.querySelector('.sub-tabs .tab-btn[onclick*="\'"+n+"\'"]'); if(b) switchTab(n,b); }
+function switchTabByName(n){
+  var btns=document.querySelectorAll('.sub-tabs .tab-btn');
+  for(var i=0;i<btns.length;i++){
+    var oc=btns[i].getAttribute('onclick')||'';
+    if(oc.indexOf("'"+n+"'")>=0){ switchTab(n, btns[i]); return; }
+  }
+  switchTab(n, null);
+}
 
 /* Historique */
 function _loadHistoryArr(){ try{ var r=localStorage.getItem('sv_history'); return r?JSON.parse(r):[]; }catch(e){ return []; } }
@@ -3586,7 +3620,7 @@ async function _roomEnter(code) {
   if (typeof recordEvent === 'function') recordEvent('🔗', 'Session ouverte', code);
   _startRoomPoll();
 }
-function roomLeave() { _stopRoomPoll(); _room = null; _showDlgLive(false); appLog('info', 'Session quittée'); }
+function roomLeave() { if (_chatCam.running) _chatCamStop(); _stopRoomPoll(); _room = null; _showDlgLive(false); appLog('info', 'Session quittée'); }
 function _stopRoomPoll() { if (_roomPoll) { clearInterval(_roomPoll); _roomPoll = null; } }
 function _startRoomPoll() { _stopRoomPoll(); if (_room) { _roomPoll = setInterval(_roomTick, 1300); _roomTick(); } }
 function roomShare() {
@@ -3695,11 +3729,100 @@ function chatVoice() {
   var b = document.getElementById('ciVoice'); if (b) b.classList.toggle('rec', _listening);
 }
 
-/* 📷 Signer : bascule vers la caméra (les phrases partent dans la session) */
-function chatGesture() {
-  appLog('info', 'Caméra : signez — vos phrases sont envoyées dans la session en cours');
-  switchTabByName('cam');
-  if (!running) startCam();
+/* 📷 Caméra INTÉGRÉE au chat : capture des signes en temps réel, sans quitter le chat */
+var _chatCam = { stream:null, raf:null, running:false, hold:null, holdStart:0,
+                 phrase:[], lastTs:0, lastVideoTime:-1, cooldown:0, inactivity:null, draw:null };
+async function chatGesture() {
+  if (_chatCam.running) { _chatCamStop(); return; }
+  var panel = document.getElementById('chatCamPanel');
+  if (panel) panel.style.display = 'block';
+  _chatCamShow('Chargement du modèle…');
+  try { await ensureMP(); } catch(e) { _chatCamShow('IA non prête — réessayez'); return; }
+  var vid = document.getElementById('chatVid'), cvs = document.getElementById('chatCvs'), ctx = cvs.getContext('2d');
+  try {
+    _chatCam.stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: _facing }, width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
+    vid.srcObject = _chatCam.stream; await vid.play().catch(function() {});
+  } catch(e) { _chatCamShow('Caméra refusée : ' + e.message); return; }
+  await new Promise(function(r) { if (vid.videoWidth) r(); else { vid.onloadedmetadata = r; setTimeout(r, 1500); } });
+  cvs.width = vid.videoWidth || 640; cvs.height = vid.videoHeight || 480;
+  if (_TV) { try { _chatCam.draw = new _TV.DrawingUtils(ctx); } catch(e) { _chatCam.draw = null; } }
+  _chatCam.running = true; _chatCam.phrase = []; _chatCam.hold = null; _chatCam.lastVideoTime = -1;
+  _chatCamShow('✋ Montrez un signe…');
+  document.getElementById('chatCamPhrase').textContent = 'Maintenez un signe 1 s pour l\'ajouter';
+  var sw = document.getElementById('ccSwitch');
+  try {
+    var devs = await navigator.mediaDevices.enumerateDevices();
+    if (sw) sw.style.display = devs.filter(function(d){return d.kind==='videoinput';}).length > 1 ? 'flex' : 'none';
+  } catch(_) {}
+  _chatCam.raf = requestAnimationFrame(_chatCamLoop);
+  appLog('ok', '📷 Caméra ouverte dans le chat — signez, la phrase part dans la session');
+}
+function _chatCamShow(t) { var e = document.getElementById('chatCamLive'); if (e) e.textContent = t; }
+function _chatCamLoop(ts) {
+  if (!_chatCam.running) return;
+  _chatCam.raf = requestAnimationFrame(_chatCamLoop);
+  var vid = document.getElementById('chatVid');
+  if (!ts) ts = performance.now();
+  if (ts - _chatCam.lastTs < 55 || vid.readyState < 2) return;
+  _chatCam.lastTs = ts;
+  if (vid.currentTime === _chatCam.lastVideoTime) return;
+  _chatCam.lastVideoTime = vid.currentTime;
+  var res; try { res = _handLandmarker.detectForVideo(vid, ts); } catch(e) { return; }
+  var lms = (res && res.landmarks) ? res.landmarks : [];
+  var cvs = document.getElementById('chatCvs'), ctx = cvs.getContext('2d');
+  ctx.clearRect(0, 0, cvs.width, cvs.height);
+  if (!lms.length) { _chatCamShow('✋ Montrez un signe…'); _chatCam.hold = null; return; }
+  for (var hi = 0; hi < lms.length; hi++) {
+    if (_chatCam.draw && _TV) { try {
+      _chatCam.draw.drawConnectors(lms[hi], _TV.HandLandmarker.HAND_CONNECTIONS, { color:'#22c55e', lineWidth:3 });
+      _chatCam.draw.drawLandmarks(lms[hi], { color:'#fff', fillColor:'#16a34a', radius:3 });
+    } catch(e) {} }
+  }
+  var r = null;
+  if (lms.length >= 2) { var bi = classifyBimanual(lms[0], lms[1]); if (bi.sign) r = { sign: bi.sign }; }
+  if (!r) { var dom = lms[0]; if (lms.length >= 2 && lms[1][0].x < lms[0][0].x) dom = lms[1]; r = classify(dom); }
+  _chatCamDetect(r.sign);
+}
+function _chatCamDetect(sign) {
+  var now = Date.now();
+  if (!sign) { _chatCamShow('—'); return; }
+  _chatCamShow((sign.emoji || '') + ' ' + sign.fr);
+  if (_chatCam.hold && _chatCam.hold.key === sign.key) {
+    if (now - _chatCam.holdStart > 1000 && now > _chatCam.cooldown) {
+      _chatCam.phrase.push(sign.fr);
+      _chatCam.cooldown = now + 1200; _chatCam.holdStart = now;
+      var pe = document.getElementById('chatCamPhrase'); if (pe) pe.textContent = _chatCam.phrase.join(' ');
+      clearTimeout(_chatCam.inactivity);
+      _chatCam.inactivity = setTimeout(_chatCamSend, 3000);   // envoi auto après une pause
+    }
+  } else { _chatCam.hold = sign; _chatCam.holdStart = now; }
+}
+function _chatCamSend() {
+  clearTimeout(_chatCam.inactivity);
+  if (!_chatCam.phrase.length) return;
+  var txt = _chatCam.phrase.join(' ');
+  roomSend(txt, 'sign');
+  _chatCam.phrase = [];
+  var pe = document.getElementById('chatCamPhrase'); if (pe) pe.textContent = 'Maintenez un signe 1 s pour l\'ajouter';
+}
+function _chatCamStop() {
+  _chatCamSend();                       // envoie ce qui reste
+  _chatCam.running = false;
+  if (_chatCam.raf) cancelAnimationFrame(_chatCam.raf);
+  clearTimeout(_chatCam.inactivity);
+  if (_chatCam.stream) _chatCam.stream.getTracks().forEach(function(t) { t.stop(); });
+  _chatCam.stream = null;
+  var p = document.getElementById('chatCamPanel'); if (p) p.style.display = 'none';
+}
+async function switchCameraChat() {
+  _facing = (_facing === 'user') ? 'environment' : 'user';
+  var vid = document.getElementById('chatVid');
+  try {
+    if (_chatCam.stream) _chatCam.stream.getTracks().forEach(function(t) { t.stop(); });
+    _chatCam.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: _facing } }, audio: false });
+    vid.srcObject = _chatCam.stream; await vid.play().catch(function() {});
+  } catch(e) { appLog('err', 'Changement caméra : ' + e.message); }
 }
 
 /* 🌐 Mode avatar (rôles qui signent) : l'avatar joue le texte tapé */

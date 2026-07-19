@@ -923,6 +923,24 @@ textarea{resize:vertical;min-height:100px;grid-column:1/-1}
   .app-nav .anav span{display:none}
   .lp-nav-links a:not(.btn-hero){display:none}
 }
+/* ══ DIALOGUE / SESSION ══════════════════════════════════ */
+.role-grid{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+.role-opt{display:flex;flex-direction:column;align-items:center;gap:.3rem;padding:.9rem .5rem;border:2px solid var(--border);border-radius:12px;cursor:pointer;background:var(--card);transition:all .15s;text-align:center}
+.role-opt:hover{border-color:#c7d2fe}
+.role-opt.sel{border-color:var(--brand);background:#eef2ff}
+body.dark .role-opt.sel{background:#1c1c2b}
+.role-opt .ro-ic{font-size:26px;line-height:1}
+.role-opt .ro-name{font-size:14px;font-weight:800}
+.role-opt .ro-desc{font-size:10.5px;color:var(--muted);line-height:1.3}
+.join-row{display:flex;gap:.5rem;margin-top:.7rem}
+.join-row input{flex:1;padding:.65rem .8rem;border:1.5px solid var(--border);border-radius:9px;font:inherit;font-size:15px;letter-spacing:.15em;font-weight:700;background:var(--card);color:var(--text)}
+.room-bar{display:flex;align-items:center;justify-content:space-between;gap:.6rem;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:.6rem .85rem;box-shadow:var(--sh);margin-bottom:.7rem}
+.rb-code{font-size:16px;font-weight:900;letter-spacing:.12em;color:var(--brand)}
+.rb-peers{font-size:11px;color:var(--muted);margin-left:.5rem}
+.rb-acts{display:flex;gap:.4rem}
+.cam-switch{position:absolute;top:10px;right:10px;z-index:5;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:38px;height:38px;font-size:18px;cursor:pointer;display:none;align-items:center;justify-content:center}
+.cam-switch.show{display:flex}
+
 /* ══ AVATAR 3D ═══════════════════════════════════════════ */
 .avatar-pane{max-width:640px;margin:0 auto;padding:1rem}
 .avatar-stage{position:relative;border-radius:14px;overflow:hidden;box-shadow:var(--sh)}
@@ -1324,6 +1342,7 @@ body.dark .ai-ic,body.dark .hist-ic,body.dark .feat-ic,body.dark .qa-ic{filter:b
       <div class="vid-card" id="vidCard">
         <video id="vid" autoplay muted playsinline></video>
         <canvas id="cvs"></canvas>
+        <button class="cam-switch" id="camSwitch" onclick="switchCamera()" title="Changer de caméra (avant/arrière)">🔄</button>
         <div class="dbg-box" id="dbgBox"></div>
 
         <!-- Idle overlay (hidden when cam is running) -->
@@ -1448,41 +1467,62 @@ body.dark .ai-ic,body.dark .hist-ic,body.dark .feat-ic,body.dark .qa-ic{filter:b
 <div id="pane-talk" class="pane">
   <div class="talk-wrap">
 
-    <!-- Statuts des interlocuteurs -->
-    <div class="status-bar" id="statusBar">
-      <div class="status-chip" onclick="openStatusModal()">
-        <span class="sc-label">Moi</span>
-        <span class="sc-val" id="scMe">👂 Entendant</span>
+    <!-- ÉTAPE 1+2 : rôle + connexion -->
+    <div id="dlgConnect">
+      <div class="card">
+        <div class="card-hdr">1 · Choisissez votre rôle</div>
+        <div class="role-grid" id="roleGrid"></div>
       </div>
-      <span class="status-swap">⇄</span>
-      <div class="status-chip" onclick="openStatusModal()">
-        <span class="sc-label">L'autre personne</span>
-        <span class="sc-val" id="scOther">👂 Entendant</span>
+      <div class="card">
+        <div class="card-hdr">2 · Connectez-vous à l'autre personne</div>
+        <p class="mode-hint" style="text-align:left;margin:0 0 .8rem">Créez une session et partagez le <strong>code</strong> (ou le lien), ou saisissez le code reçu. Téléphone et PC se rejoignent dans la même session, où qu'ils soient.</p>
+        <button class="btn btn-primary btn-block" onclick="roomCreate()">➕ Créer une session</button>
+        <div class="join-row">
+          <input id="roomCodeInput" placeholder="Code reçu (ex : 4F2A)" maxlength="8" autocomplete="off" style="text-transform:uppercase">
+          <button class="btn btn-ai" onclick="roomJoinFromInput()">Rejoindre</button>
+        </div>
       </div>
-      <button class="btn-status-edit" onclick="openStatusModal()" title="Changer les statuts">⚙</button>
-    </div>
-    <div class="mode-hint" id="modeHint"></div>
-
-    <!-- Reconnaissance vocale : la personne entendante parle → texte -->
-    <div class="listen-card" id="listenCard">
-      <div class="listen-live" id="listenLive">Appuyez sur le micro puis parlez — le texte s'affichera ici.</div>
-      <button class="mic-btn" id="micBtn" onclick="toggleListen()">
-        <span id="micIcon">🎙️</span><span id="micLabel">Écouter</span>
-      </button>
-      <div class="listen-manual" id="listenManual" style="display:none">
-        <input id="manualText" type="text" placeholder="Ou tapez le message ici…" onkeydown="if(event.key==='Enter')sendManual()">
-        <button onclick="sendManual()">Envoyer</button>
+      <div class="card" style="text-align:center">
+        <div class="card-hdr">Mode solo (un seul appareil)</div>
+        <p class="mode-hint" style="margin:0 0 .7rem">Deux personnes autour du même téléphone/PC : reconnaissance des signes + parole sur cet appareil.</p>
+        <button class="btn btn-ghost btn-block" onclick="roomSolo()">👥 Continuer en solo</button>
       </div>
     </div>
 
-    <!-- Historique de conversation -->
-    <div class="conv-card">
-      <div class="conv-hdr">
-        <span>💬 Conversation</span>
-        <button onclick="clearConversation()" title="Effacer la conversation">🗑 Effacer</button>
+    <!-- ÉTAPE 3 : échange en direct -->
+    <div id="dlgLive" style="display:none">
+      <div class="room-bar">
+        <div class="rb-info">
+          <span class="rb-code" id="roomCodeShow">—</span>
+          <span class="rb-peers" id="roomPeers">en solo</span>
+        </div>
+        <div class="rb-acts">
+          <button class="av-btn" id="btnRoomShare" onclick="roomShare()">🔗 Partager</button>
+          <button class="av-btn" onclick="roomLeave()">✕ Quitter</button>
+        </div>
       </div>
-      <div class="conv-body" id="convBody">
-        <div class="conv-empty" id="convEmpty">La conversation apparaîtra ici — signes reconnus et paroles transcrites.</div>
+      <div class="mode-hint" id="roomHint"></div>
+
+      <div class="listen-card" id="listenCard">
+        <div class="listen-live" id="listenLive">Appuyez sur le micro et parlez, ou tapez votre message.</div>
+        <button class="mic-btn" id="micBtn" onclick="toggleListen()">
+          <span id="micIcon">🎙️</span><span id="micLabel">Parler</span>
+        </button>
+        <div class="listen-manual" id="listenManual" style="display:flex">
+          <input id="manualText" type="text" placeholder="Écrire un message…" onkeydown="if(event.key==='Enter')sendManual()">
+          <button onclick="sendManual()">Envoyer</button>
+        </div>
+        <p style="font-size:11px;color:var(--muted);margin:0;text-align:center">🤟 Pour signer : onglet <strong>Caméra</strong> — vos phrases sont envoyées automatiquement dans la session.</p>
+      </div>
+
+      <div class="conv-card">
+        <div class="conv-hdr">
+          <span>💬 Échange</span>
+          <button onclick="clearConversation()" title="Effacer">🗑 Effacer</button>
+        </div>
+        <div class="conv-body" id="convBody">
+          <div class="conv-empty" id="convEmpty">Les messages apparaîtront ici.</div>
+        </div>
       </div>
     </div>
 
@@ -1713,9 +1753,15 @@ function switchTab(name, btn) {
   document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
   document.getElementById('pane-' + name).classList.add('active');
   if (btn) btn.classList.add('active');
-  // Première ouverture du Dialogue sans statut configuré → propose la config
-  if (name === 'talk' && !localStorage.getItem('lsf_status')) {
-    setTimeout(openStatusModal, 250);
+  if (name === 'talk') {
+    _buildRoleGrid();
+    if (_pendingRoom) {
+      var c = _pendingRoom; _pendingRoom = null;
+      var ci = document.getElementById('roomCodeInput'); if (ci) ci.value = c;
+      setTimeout(function() { _roomEnter(c); }, 250);
+    } else if (!_room) {
+      _showDlgLive(false);   // repart sur l'écran rôle+connexion
+    }
   }
   if (name === 'avatar') _initAvatarViewer();
 }
@@ -1948,7 +1994,11 @@ function _completeLogin(user){
   recordEvent('🔑', 'Connexion', user.email);
   appLog('ok','Connecté : '+user.email+' ('+user.provider+')');
   if(!localStorage.getItem('sv_onboarded')) startOnboarding();
-  else { showScreen('app'); showView('home'); }
+  else {
+    showScreen('app');
+    if (_pendingRoom) { showView('interpret'); setTimeout(function(){ switchTabByName('talk'); }, 60); }
+    else showView('home');
+  }
 }
 
 function _avatarFor(u){
@@ -2069,9 +2119,16 @@ function _bootAuth(){
   _loadSession();
   _loadTheme();
   _initGoogleAuth();
+  // Lien de session partagé : ?room=CODE → on rejoint après connexion
+  var rm = /[?&]room=([A-Za-z0-9]+)/.exec(location.search || '');
+  if (rm) _pendingRoom = rm[1].toUpperCase();
   if(_session){
     _applySession();
-    if(localStorage.getItem('sv_onboarded')){ showScreen('app'); showView('home'); }
+    if(localStorage.getItem('sv_onboarded')){
+      showScreen('app');
+      if (_pendingRoom) { showView('interpret'); setTimeout(function(){ switchTabByName('talk'); }, 60); }
+      else showView('home');
+    }
     else startOnboarding();
   } else {
     showScreen('landing');
@@ -2159,7 +2216,9 @@ function obFinish(){
   }
   try{ localStorage.setItem('sv_onboarded','1'); }catch(e){}
   recordEvent('🎉','Bienvenue sur SignVoice','Configuration terminée');
-  showScreen('app'); showView('home');
+  showScreen('app');
+  if (_pendingRoom) { showView('interpret'); setTimeout(function(){ switchTabByName('talk'); }, 60); }
+  else showView('home');
 }
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -2900,11 +2959,17 @@ async function startCam() {
 
   try {
     stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'user' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      video: { facingMode: { ideal: _facing }, width: { ideal: 1280 }, height: { ideal: 720 } },
       audio: false
     });
     var track = stream.getVideoTracks()[0];
     appLog('ok', 'Caméra accordée: ' + (track ? track.label : 'inconnue'));
+    try {
+      var devs = await navigator.mediaDevices.enumerateDevices();
+      var cams = devs.filter(function(d) { return d.kind === 'videoinput'; });
+      var sw = document.getElementById('camSwitch');
+      if (sw && cams.length > 1) sw.classList.add('show');   // bouton avant/arrière
+    } catch(_) {}
   } catch(e1) {
     appLog('warn', 'Caméra HD refusée (' + e1.message + ') — essai mode dégradé…');
     try {
@@ -3073,6 +3138,7 @@ function _resetCamUI() {
   document.getElementById('btnStart').style.display  = 'inline-flex';
   document.getElementById('btnStop').style.display   = 'none';
   document.getElementById('btnLearn').style.display  = 'none';
+  var _sw = document.getElementById('camSwitch'); if (_sw) _sw.classList.remove('show');
   document.getElementById('idleOverlay').style.display = 'flex';
   document.getElementById('vidOverlay').style.display  = 'none';
   document.getElementById('holdRing').style.display    = 'none';
@@ -3172,7 +3238,7 @@ function _addWord(sign) {
       var txt = exact ? exact.fr : sentence.join(' ');
       appLog('info', '⏱ Lecture auto mot à mot : «' + txt + '»');
       speakWordByWord(txt);
-      addConv('me', 'sign', txt);
+      _emitSign(txt);
     }
   }, delay);
 }
@@ -3258,7 +3324,7 @@ function speakSentence() {
   var txt = exact ? exact.fr : sentence.join(' ');
   appLog('info', '🔊 Lecture mot à mot : «' + txt + '»');
   speakWordByWord(txt);
-  addConv('me', 'sign', txt);
+  _emitSign(txt);
   if (typeof recordEvent === 'function') recordEvent('🔊', 'Phrase lue (mot à mot)', txt);
 }
 
@@ -3353,7 +3419,7 @@ async function makeSentence() {
       var em = document.getElementById('naturalEmoji'); if (em) em.textContent = _emojiForText(r.result);
       var av = document.getElementById('avatarText'); if (av) av.value = r.result;
       speakFR(r.result);
-      addConv('me', 'sign', r.result);
+      _emitSign(r.result);
       if (typeof recordEvent === 'function') recordEvent('✨', 'Phrase formée par l\'IA', r.result);
       appLog('ok', '✨ Phrase IA : «' + r.result + '»');
     } else if (r.error === 'no-key') {
@@ -3412,12 +3478,132 @@ function _renderStatusBar() {
 }
 
 function _applyStatusUI() {
-  var me = _statusByKey(userStatus), ot = _statusByKey(otherStatus);
-  // Le micro (parole→texte) sert quand l'autre PEUT parler (sinon rien à écouter)
   var listenCard = document.getElementById('listenCard');
-  if (listenCard) listenCard.style.opacity = ot.canSpeak ? '1' : '.55';
-  // Bouton "Apprendre ce signe" déjà géré ailleurs ; ici on n'enlève rien.
+  if (listenCard) listenCard.style.opacity = '1';
   _renderStatusBar();
+}
+
+/* ══════════════ SESSION D'ÉCHANGE (téléphone ↔ PC) ══════════════ */
+var _room = null, _roomPid = null, _roomSince = 0, _roomPoll = null, _pendingRoom = null;
+
+function _buildRoleGrid() {
+  var g = document.getElementById('roleGrid');
+  if (!g) return; g.innerHTML = '';
+  STATUSES.forEach(function(s) {
+    var d = document.createElement('div');
+    d.className = 'role-opt' + (s.key === userStatus ? ' sel' : '');
+    d.innerHTML = '<span class="ro-ic">' + s.icon + '</span><span class="ro-name">' + s.name + '</span><span class="ro-desc">' + s.desc + '</span>';
+    d.onclick = function() { userStatus = s.key; _saveStatusLS(); _buildRoleGrid(); };
+    g.appendChild(d);
+  });
+}
+function _showDlgLive(live) {
+  var c = document.getElementById('dlgConnect'), l = document.getElementById('dlgLive');
+  if (c) c.style.display = live ? 'none' : 'block';
+  if (l) l.style.display = live ? 'block' : 'none';
+}
+function _genCode() {
+  var c = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', s = '';
+  for (var i = 0; i < 4; i++) s += c[Math.floor(Math.random() * c.length)];
+  return s;
+}
+async function roomCreate() { await _roomEnter(_genCode()); }
+async function roomJoinFromInput() {
+  var v = (document.getElementById('roomCodeInput').value || '').trim().toUpperCase();
+  if (!v) { appLog('warn', 'Entrez un code de session'); return; }
+  await _roomEnter(v);
+}
+function roomSolo() {
+  _room = null; _stopRoomPoll(); _showDlgLive(true);
+  var e;
+  if (e = document.getElementById('roomCodeShow')) e.textContent = 'Solo';
+  if (e = document.getElementById('roomPeers')) e.textContent = 'un seul appareil';
+  if (e = document.getElementById('btnRoomShare')) e.style.display = 'none';
+  appLog('info', 'Mode solo — deux personnes, un appareil');
+}
+async function _roomEnter(code) {
+  _room = code; _roomSince = 0;
+  _roomPid = _roomPid || ('p' + Math.floor(Math.random() * 1e9).toString(36));
+  try {
+    var r = await fetch('/api/room/' + encodeURIComponent(code) + '/join', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pid: _roomPid, role: userStatus, name: (_session && _session.name) || 'Invité' })
+    }).then(function(x) { return x.json(); });
+    if (r && r.pid) _roomPid = r.pid;
+  } catch(e) { appLog('err', 'Connexion à la session impossible : ' + e.message); return; }
+  _showDlgLive(true);
+  var e;
+  if (e = document.getElementById('roomCodeShow')) e.textContent = code;
+  if (e = document.getElementById('btnRoomShare')) e.style.display = '';
+  appLog('ok', 'Session ' + code + ' — partagez le code avec l\'autre personne');
+  if (typeof recordEvent === 'function') recordEvent('🔗', 'Session ouverte', code);
+  _startRoomPoll();
+}
+function roomLeave() { _stopRoomPoll(); _room = null; _showDlgLive(false); appLog('info', 'Session quittée'); }
+function _stopRoomPoll() { if (_roomPoll) { clearInterval(_roomPoll); _roomPoll = null; } }
+function _startRoomPoll() { _stopRoomPoll(); if (_room) { _roomPoll = setInterval(_roomTick, 1300); _roomTick(); } }
+function roomShare() {
+  if (!_room) return;
+  var url = location.origin + location.pathname + '?room=' + _room;
+  if (navigator.share) { navigator.share({ title: 'SignVoice', text: 'Rejoignez ma session SignVoice (code ' + _room + ')', url: url }).catch(function() {}); }
+  else {
+    try { navigator.clipboard.writeText(url); appLog('ok', 'Lien copié'); } catch(e) {}
+    alert('Partagez ce lien avec l\'autre personne :\n' + url + '\n\nOu le code : ' + _room);
+  }
+}
+async function _roomTick() {
+  if (!_room) return;
+  try {
+    var r = await fetch('/api/room/' + encodeURIComponent(_room) + '/poll?since=' + _roomSince + '&pid=' + encodeURIComponent(_roomPid))
+      .then(function(x) { return x.json(); });
+    (r.messages || []).forEach(function(m) {
+      if (m.ts > _roomSince) _roomSince = m.ts;
+      if (m.pid === _roomPid) return;   // ne pas ré-afficher mes propres messages
+      _renderIncoming(m);
+    });
+    var others = (r.participants || []).filter(function(p) { return p.pid !== _roomPid; });
+    var e = document.getElementById('roomPeers');
+    if (e) e.textContent = others.length
+      ? (others.length + ' connecté(s) · ' + others.map(function(p) { return _statusByKey(p.role).icon; }).join(' '))
+      : 'en attente de l\'autre personne…';
+  } catch(e) {}
+}
+function _renderIncoming(m) {
+  var entry = { t: (m.ts || 0) * 1000 || Date.now(), who: 'other', kind: m.kind || 'text', text: m.text };
+  CONV.push(entry); if (CONV.length > 100) CONV.shift(); _saveConv();
+  _appendConvBubble(entry);
+  if (_statusByKey(userStatus).canHear && m.text) speakFR(m.text);  // je peux entendre → lecture auto
+}
+function roomSend(text, kind) {
+  if (!text) return;
+  var entry = { t: Date.now(), who: 'me', kind: kind || 'text', text: text };
+  CONV.push(entry); if (CONV.length > 100) CONV.shift(); _saveConv();
+  _appendConvBubble(entry);
+  if (_room) {
+    fetch('/api/room/' + encodeURIComponent(_room) + '/send', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pid: _roomPid, role: userStatus, name: (_session && _session.name) || '', kind: kind || 'text', text: text })
+    }).catch(function() {});
+  }
+}
+// Émission depuis mes signes (caméra) / ma voix / mon texte.
+function _emitSign(text) { if (_room) roomSend(text, 'sign'); else addConv('me', 'sign', text); }
+function _emitVoice(text) { if (_room) roomSend(text, 'speech'); else addConv('other', 'speech', text); }
+
+/* ── Changement de caméra (avant / arrière) ── */
+var _facing = 'user';
+async function switchCamera() {
+  if (!running) { appLog('warn', 'Démarrez d\'abord la caméra'); return; }
+  _facing = (_facing === 'user') ? 'environment' : 'user';
+  appLog('info', 'Caméra → ' + (_facing === 'user' ? 'avant' : 'arrière'));
+  var vid = document.getElementById('vid');
+  try {
+    if (stream) stream.getTracks().forEach(function(t) { t.stop(); });
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: _facing }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+    vid.srcObject = stream;
+    await vid.play().catch(function() {});
+  } catch(e) { appLog('err', 'Changement de caméra impossible : ' + e.message); }
 }
 
 function openStatusModal() {
@@ -3480,7 +3666,7 @@ function _initSR() {
     }
     var live = document.getElementById('listenLive');
     if (finalTxt.trim()) {
-      addConv('other', 'speech', finalTxt.trim());
+      _emitVoice(finalTxt.trim());
       if (live) live.innerHTML = '<span class="interim">…</span>';
     } else if (live) {
       live.innerHTML = '<span class="interim">' + (interim || '…') + '</span>';
@@ -3536,7 +3722,7 @@ function sendManual() {
   if (!inp) return;
   var t = inp.value.trim();
   if (!t) return;
-  addConv('other', 'speech', t);
+  _emitVoice(t);
   inp.value = '';
 }
 
@@ -3789,6 +3975,76 @@ def avatar_model():
         resp.headers['Access-Control-Allow-Origin'] = '*'
         return resp
     return 'avatar non configuré', 404
+
+# ── Relais de session (téléphone ↔ PC) via fichiers /tmp partagés ──
+# Chaque appareil rejoint une « salle » par code ; messages relayés par le
+# serveur (le Bluetooth / scan réseau est impossible depuis un navigateur).
+_ROOMS_DIR = Path('/tmp/sv_rooms')
+
+def _room_dir(code):
+    c = re.sub(r'[^A-Za-z0-9]', '', code or '')[:16] or 'x'
+    d = _ROOMS_DIR / c
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+def _room_parts(d):
+    now, out = time.time(), []
+    for f in d.glob('part_*.json'):
+        try:
+            o = _json.loads(f.read_text())
+            if now - o.get('ts', 0) < 25:
+                out.append({'role': o.get('role', 'normal'), 'name': o.get('name', '?'), 'pid': o.get('pid', '')})
+        except Exception:
+            pass
+    return out
+
+@app.route('/api/room/<code>/join', methods=['POST'])
+def room_join(code):
+    data = request.get_json(silent=True) or {}
+    d = _room_dir(code)
+    pid = re.sub(r'\W', '', (data.get('pid') or ''))[:16] or ('%x' % int(time.time() * 1000))
+    (d / ('part_' + pid + '.json')).write_text(_json.dumps({
+        'pid': pid, 'role': data.get('role', 'normal'),
+        'name': (data.get('name') or '?')[:40], 'ts': time.time()}))
+    return jsonify({'ok': True, 'pid': pid, 'participants': _room_parts(d)})
+
+@app.route('/api/room/<code>/send', methods=['POST'])
+def room_send(code):
+    data = request.get_json(silent=True) or {}
+    d = _room_dir(code)
+    ts = time.time()
+    pid = re.sub(r'\W', '', (data.get('pid') or ''))[:16]
+    (d / ('msg_%.6f_%s.json' % (ts, pid))).write_text(_json.dumps({
+        'ts': ts, 'pid': data.get('pid', ''), 'role': data.get('role', ''),
+        'name': (data.get('name') or '')[:40], 'kind': data.get('kind', 'text'),
+        'text': (data.get('text') or '')[:2000]}))
+    return jsonify({'ok': True, 'ts': ts})
+
+@app.route('/api/room/<code>/poll')
+def room_poll(code):
+    try:
+        since = float(request.args.get('since') or 0)
+    except ValueError:
+        since = 0
+    pid = re.sub(r'\W', '', request.args.get('pid', ''))[:16]
+    d = _room_dir(code)
+    if pid:
+        pf = d / ('part_' + pid + '.json')
+        if pf.exists():
+            try:
+                o = _json.loads(pf.read_text()); o['ts'] = time.time(); pf.write_text(_json.dumps(o))
+            except Exception:
+                pass
+    msgs = []
+    for f in d.glob('msg_*.json'):
+        try:
+            o = _json.loads(f.read_text())
+            if o.get('ts', 0) > since:
+                msgs.append(o)
+        except Exception:
+            pass
+    msgs.sort(key=lambda m: m['ts'])
+    return jsonify({'messages': msgs[-80:], 'participants': _room_parts(d), 'now': time.time()})
 
 @app.route('/api/enhance', methods=['POST'])
 def enhance():

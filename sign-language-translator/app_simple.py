@@ -1627,6 +1627,25 @@ body.dark .ai-ic,body.dark .hist-ic,body.dark .feat-ic,body.dark .qa-ic{filter:b
     </div>
 
     <div class="set-card">
+      <h3>Intelligence artificielle (former des phrases)</h3>
+      <p style="font-size:12px;color:var(--muted);line-height:1.55;margin-bottom:.8rem">Collez votre clé API pour transformer les signes détectés en vraies phrases. La clé est stockée <strong>dans votre navigateur</strong> et envoyée uniquement au moment de la génération.</p>
+      <div class="set-row" style="flex-direction:column;align-items:stretch;gap:.5rem">
+        <label class="learn-label">Fournisseur</label>
+        <select id="setLlmProvider">
+          <option value="gemini">Google Gemini (gratuit)</option>
+          <option value="groq">Groq / Llama (gratuit)</option>
+          <option value="anthropic">Claude (Anthropic)</option>
+        </select>
+        <label class="learn-label" style="margin-top:.4rem">Clé API</label>
+        <input id="setLlmKey" type="password" placeholder="Collez votre clé ici…" style="width:100%;padding:.6rem .75rem;border:1.5px solid var(--border);border-radius:8px;font:inherit;font-size:13px;background:var(--card);color:var(--text)">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:.6rem;margin-top:.3rem">
+          <span id="llmStatus" style="font-size:12px;color:var(--muted)">Aucune clé enregistrée</span>
+          <button class="btn-hero primary" style="padding:.5rem 1.2rem;font-size:13px" onclick="saveLlmKey()">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="set-card">
       <h3>Application</h3>
       <div class="set-row">
         <div><div class="sr-l">Signes appris</div><div class="sr-d" id="setSignsCount">0 signe(s) enregistré(s)</div></div>
@@ -2004,6 +2023,10 @@ function _refreshDash(){
 function _refreshSettings(){
   var e=document.getElementById('setSignsCount');
   if(e){ var n=(typeof LEARNED_SIGNS!=='undefined'&&LEARNED_SIGNS)?LEARNED_SIGNS.length:0; e.textContent=n+' signe(s) enregistré(s)'; }
+  var cfg=_getLlmCfg();
+  var ki=document.getElementById('setLlmKey'); if(ki) ki.value=cfg.key;
+  var pv=document.getElementById('setLlmProvider'); if(pv) pv.value=cfg.provider;
+  var st=document.getElementById('llmStatus'); if(st) st.textContent = cfg.key ? '✓ Clé enregistrée ('+cfg.provider+')' : 'Aucune clé enregistrée';
 }
 function _setTtsRate(v){ _ttsRate=parseFloat(v)||0.9; }
 
@@ -3197,6 +3220,21 @@ function speakSentence() {
 }
 
 /* ── Modèle de langage : gloses → phrase naturelle ── */
+function _getLlmCfg() {
+  try {
+    return { key: localStorage.getItem('sv_llm_key') || '',
+             provider: localStorage.getItem('sv_llm_provider') || 'gemini',
+             model: localStorage.getItem('sv_llm_model') || '' };
+  } catch(e) { return { key:'', provider:'gemini', model:'' }; }
+}
+function saveLlmKey() {
+  var k = (document.getElementById('setLlmKey').value || '').trim();
+  var p = document.getElementById('setLlmProvider').value || 'gemini';
+  try { localStorage.setItem('sv_llm_key', k); localStorage.setItem('sv_llm_provider', p); } catch(e) {}
+  var st = document.getElementById('llmStatus');
+  if (st) st.textContent = k ? '✓ Clé enregistrée (' + p + ')' : 'Aucune clé enregistrée';
+  appLog('ok', k ? 'Clé IA enregistrée (' + p + ')' : 'Clé IA effacée');
+}
 function _showNaturalSent(txt, muted) {
   var el = document.getElementById('naturalSent');
   if (!el) return;
@@ -3207,13 +3245,14 @@ function _showNaturalSent(txt, muted) {
 async function makeSentence() {
   if (!sentence.length) { appLog('warn', 'Aucun signe à assembler — montrez d\'abord des signes'); return; }
   var glosses = _sentenceObjs.map(function(s) { return s.fr; }).join(' ');
+  var cfg = _getLlmCfg();
   var btn = document.getElementById('btnMakeSentence');
   var old = btn ? btn.textContent : '';
   if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Génération…'; }
   try {
     var r = await fetch('/api/enhance', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: glosses, mode: 'gloss' })
+      body: JSON.stringify({ text: glosses, mode: 'gloss', apiKey: cfg.key, provider: cfg.provider, model: cfg.model })
     }).then(function(x) { return x.json(); });
     if (r.result) {
       _showNaturalSent(r.result, false);
@@ -3223,8 +3262,8 @@ async function makeSentence() {
       if (typeof recordEvent === 'function') recordEvent('✨', 'Phrase formée par l\'IA', r.result);
       appLog('ok', '✨ Phrase IA : «' + r.result + '»');
     } else if (r.error === 'no-key') {
-      _showNaturalSent(glosses + '  —  (IA non configurée : ajoutez la variable LLM_API_KEY sur le serveur)', true);
-      appLog('warn', 'Modèle de langage non configuré (LLM_API_KEY absente) — repli sur les gloses');
+      _showNaturalSent(glosses + '  —  (IA non configurée : collez votre clé dans Réglages)', true);
+      appLog('warn', 'Aucune clé IA — ouvrez Réglages › Intelligence artificielle pour la coller');
     } else {
       _showNaturalSent(glosses, true);
       appLog('warn', 'IA indisponible (' + (r.error || '?') + ')');
@@ -3594,17 +3633,18 @@ def auth_config():
 import json as _json
 
 _LLM_DEFAULT_MODEL = {
-    'gemini':    'gemini-2.0-flash',
+    'gemini':    'gemini-flash-latest',   # modèle avec quota gratuit disponible
     'groq':      'llama-3.3-70b-versatile',
     'anthropic': 'claude-3-5-haiku-latest',
 }
 
-def _llm_complete(prompt, max_tokens=200):
-    key = os.environ.get('LLM_API_KEY', '')
+def _llm_complete(prompt, max_tokens=200, key=None, provider=None, model=None):
+    # Clé/fournisseur fournis par le client (BYOK) sinon variables d'environnement.
+    key = key or os.environ.get('LLM_API_KEY', '')
     if not key:
         return None, 'no-key'
-    provider = os.environ.get('LLM_PROVIDER', 'gemini').lower()
-    model = os.environ.get('LLM_MODEL', _LLM_DEFAULT_MODEL.get(provider, 'gemini-2.0-flash'))
+    provider = (provider or os.environ.get('LLM_PROVIDER', 'gemini')).lower()
+    model = model or os.environ.get('LLM_MODEL', '') or _LLM_DEFAULT_MODEL.get(provider, 'gemini-flash-latest')
     try:
         if provider == 'gemini':
             url = ('https://generativelanguage.googleapis.com/v1beta/models/'
@@ -3658,6 +3698,9 @@ def enhance():
     data = request.get_json(silent=True) or {}
     text = (data.get('text', '') or '').strip()
     mode = data.get('mode', 'gloss')
+    cli_key = (data.get('apiKey', '') or '').strip()       # BYOK : clé du navigateur
+    cli_prov = (data.get('provider', '') or '').strip()
+    cli_model = (data.get('model', '') or '').strip()
     if not text:
         return jsonify({'result': '', 'error': 'empty'})
     if mode == 'spell':
@@ -3668,7 +3711,7 @@ def enhance():
                   'suite de gloses (signes détectés) en UNE phrase française naturelle, '
                   'correcte et fluide. Réponds UNIQUEMENT par la phrase, sans guillemets '
                   'ni explication.\n\nGloses : ' + text)
-    result, err = _llm_complete(prompt)
+    result, err = _llm_complete(prompt, key=cli_key or None, provider=cli_prov or None, model=cli_model or None)
     if result is None:
         return jsonify({'result': '', 'error': err or 'llm-error'})
     return jsonify({'result': result})

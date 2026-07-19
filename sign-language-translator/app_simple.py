@@ -534,6 +534,10 @@ main{padding-top:calc(var(--hh) + 1.25rem);padding-bottom:1.25rem;
 .btn-speak{background:linear-gradient(135deg,#ecfdf5,#d1fae5);color:#065f46;border:1px solid #6ee7b7}
 .btn-alpha{background:linear-gradient(135deg,#eff6ff,#dbeafe);color:#1e40af;border:1px solid #93c5fd}
 .btn-alpha.on{background:linear-gradient(135deg,var(--brand),var(--accent));color:#fff;border-color:transparent}
+.btn-ai{background:linear-gradient(135deg,#faf5ff,#f3e8ff);color:#6b21a8;border:1px solid #d8b4fe}
+.btn-ai:hover{filter:brightness(1.03)}
+.natural-sent{background:linear-gradient(135deg,#f5f3ff,#ede9fe);border:1px solid #ddd6fe;border-radius:10px;padding:.7rem .85rem;font-size:14px;color:#5b21b6;font-weight:600;line-height:1.4}
+body.dark .natural-sent{background:#1e1633;border-color:#4c1d95;color:#c4b5fd}
 .btn-speak:hover{background:var(--green);color:#fff;border-color:var(--green)}
 .btn-block{width:100%}
 .cam-btns{display:flex;gap:.55rem;padding:.75rem}
@@ -1349,6 +1353,8 @@ body.dark .ai-ic,body.dark .hist-ic,body.dark .feat-ic,body.dark .qa-ic{filter:b
           <button class="btn btn-ghost"   onclick="clearSentence()">✕</button>
         </div>
         <div class="cam-extra">
+          <button class="btn btn-ai btn-block" id="btnMakeSentence" onclick="makeSentence()">✨ Former une phrase (IA)</button>
+          <div id="naturalSent" class="natural-sent" style="display:none"></div>
           <button class="btn btn-speak btn-block" onclick="speakSentence()">🔊 Lire la phrase à voix haute</button>
           <button class="btn btn-alpha btn-block" id="btnAlpha" onclick="toggleAlphabetMode()">🔤 Mode alphabet (épeler)</button>
           <button class="btn btn-learn btn-block" id="btnLearn" onclick="captureSign()" style="display:none">📚 Apprendre ce signe</button>
@@ -3112,6 +3118,45 @@ function speakSentence() {
   if (typeof recordEvent === 'function') recordEvent('🔊', 'Phrase lue à voix haute', txt);
 }
 
+/* ── Modèle de langage : gloses → phrase naturelle ── */
+function _showNaturalSent(txt, muted) {
+  var el = document.getElementById('naturalSent');
+  if (!el) return;
+  el.style.display = 'block';
+  el.style.opacity = muted ? '.7' : '1';
+  el.textContent = '💬 ' + txt;
+}
+async function makeSentence() {
+  if (!sentence.length) { appLog('warn', 'Aucun signe à assembler — montrez d\'abord des signes'); return; }
+  var glosses = _sentenceObjs.map(function(s) { return s.fr; }).join(' ');
+  var btn = document.getElementById('btnMakeSentence');
+  var old = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Génération…'; }
+  try {
+    var r = await fetch('/api/enhance', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: glosses, mode: 'gloss' })
+    }).then(function(x) { return x.json(); });
+    if (r.result) {
+      _showNaturalSent(r.result, false);
+      speakFR(r.result);
+      addConv('me', 'sign', r.result);
+      if (typeof recordEvent === 'function') recordEvent('✨', 'Phrase formée par l\'IA', r.result);
+      appLog('ok', '✨ Phrase IA : «' + r.result + '»');
+    } else if (r.error === 'no-key') {
+      _showNaturalSent(glosses + '  —  (IA non configurée : ajoutez la variable LLM_API_KEY sur le serveur)', true);
+      appLog('warn', 'Modèle de langage non configuré (LLM_API_KEY absente) — repli sur les gloses');
+    } else {
+      _showNaturalSent(glosses, true);
+      appLog('warn', 'IA indisponible (' + (r.error || '?') + ')');
+    }
+  } catch(e) {
+    appLog('err', 'Erreur IA : ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = old; }
+  }
+}
+
 /* ══ DIALOGUE BIDIRECTIONNEL ═══════════════════════════════
    Statuts + reconnaissance vocale (parole→texte) + historique */
 
@@ -3457,7 +3502,86 @@ def auth_config():
     # Client ID Google OAuth (public). Défini via la variable d'environnement
     # GOOGLE_CLIENT_ID pour activer la vraie connexion Google ; sinon le bouton
     # de démonstration reste actif côté client.
-    return jsonify({'googleClientId': os.environ.get('GOOGLE_CLIENT_ID', '')})
+    return jsonify({
+        'googleClientId': os.environ.get('GOOGLE_CLIENT_ID', ''),
+        'llm': bool(os.environ.get('LLM_API_KEY', '')),
+        'llmProvider': os.environ.get('LLM_PROVIDER', 'gemini'),
+    })
+
+# ── Modèle de langage : gloses LSF → phrase française naturelle ──
+# Multi-fournisseur. Définir sur Render :  LLM_API_KEY = <votre clé>
+# et éventuellement LLM_PROVIDER = gemini | groq | anthropic  (défaut gemini).
+# La clé reste côté serveur (jamais exposée au navigateur).
+import json as _json
+
+_LLM_DEFAULT_MODEL = {
+    'gemini':    'gemini-2.0-flash',
+    'groq':      'llama-3.3-70b-versatile',
+    'anthropic': 'claude-3-5-haiku-latest',
+}
+
+def _llm_complete(prompt, max_tokens=200):
+    key = os.environ.get('LLM_API_KEY', '')
+    if not key:
+        return None, 'no-key'
+    provider = os.environ.get('LLM_PROVIDER', 'gemini').lower()
+    model = os.environ.get('LLM_MODEL', _LLM_DEFAULT_MODEL.get(provider, 'gemini-2.0-flash'))
+    try:
+        if provider == 'gemini':
+            url = ('https://generativelanguage.googleapis.com/v1beta/models/'
+                   + model + ':generateContent?key=' + key)
+            body = {'contents': [{'parts': [{'text': prompt}]}],
+                    'generationConfig': {'temperature': 0.3, 'maxOutputTokens': max_tokens}}
+            req = Request(url, data=_json.dumps(body).encode('utf-8'),
+                          headers={'Content-Type': 'application/json'})
+            with urlopen(req, timeout=25) as r:
+                d = _json.loads(r.read())
+            return d['candidates'][0]['content']['parts'][0]['text'].strip(), None
+        elif provider == 'groq':
+            body = {'model': model, 'temperature': 0.3, 'max_tokens': max_tokens,
+                    'messages': [{'role': 'user', 'content': prompt}]}
+            req = Request('https://api.groq.com/openai/v1/chat/completions',
+                          data=_json.dumps(body).encode('utf-8'),
+                          headers={'Content-Type': 'application/json',
+                                   'Authorization': 'Bearer ' + key})
+            with urlopen(req, timeout=25) as r:
+                d = _json.loads(r.read())
+            return d['choices'][0]['message']['content'].strip(), None
+        elif provider == 'anthropic':
+            body = {'model': model, 'max_tokens': max_tokens,
+                    'messages': [{'role': 'user', 'content': prompt}]}
+            req = Request('https://api.anthropic.com/v1/messages',
+                          data=_json.dumps(body).encode('utf-8'),
+                          headers={'Content-Type': 'application/json',
+                                   'x-api-key': key,
+                                   'anthropic-version': '2023-06-01'})
+            with urlopen(req, timeout=25) as r:
+                d = _json.loads(r.read())
+            return d['content'][0]['text'].strip(), None
+        return None, 'bad-provider'
+    except Exception as e:
+        print('[LLM] error:', e)
+        return None, str(e)[:160]
+
+@app.route('/api/enhance', methods=['POST'])
+def enhance():
+    data = request.get_json(silent=True) or {}
+    text = (data.get('text', '') or '').strip()
+    mode = data.get('mode', 'gloss')
+    if not text:
+        return jsonify({'result': '', 'error': 'empty'})
+    if mode == 'spell':
+        prompt = ('Voici une suite de lettres épelées en langue des signes : "' + text
+                  + '". Devine le mot ou le nom le plus probable et réponds UNIQUEMENT par ce mot, sans ponctuation ni explication.')
+    else:
+        prompt = ('Tu es un interprète en Langue des Signes Française. Transforme cette '
+                  'suite de gloses (signes détectés) en UNE phrase française naturelle, '
+                  'correcte et fluide. Réponds UNIQUEMENT par la phrase, sans guillemets '
+                  'ni explication.\n\nGloses : ' + text)
+    result, err = _llm_complete(prompt)
+    if result is None:
+        return jsonify({'result': '', 'error': err or 'llm-error'})
+    return jsonify({'result': result})
 
 # ── PWA : manifest + service worker (installable / cache hors-ligne) ──
 _MANIFEST = {

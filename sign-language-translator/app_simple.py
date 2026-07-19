@@ -923,6 +923,40 @@ textarea{resize:vertical;min-height:100px;grid-column:1/-1}
   .app-nav .anav span{display:none}
   .lp-nav-links a:not(.btn-hero){display:none}
 }
+/* ══ CHAT WHATSAPP-LIKE ══════════════════════════════════ */
+.chat-wrap{display:flex;flex-direction:column;height:calc(100vh - 130px);min-height:420px;max-width:680px;margin:0 auto;background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:var(--sh)}
+.chat-head{display:flex;align-items:center;gap:.6rem;padding:.55rem .7rem;background:linear-gradient(135deg,var(--brand),var(--accent));color:#fff;flex-shrink:0}
+.chat-head .ch-icon{background:rgba(255,255,255,.14);border:none;color:#fff;width:34px;height:34px;border-radius:50%;font-size:17px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.chat-head .ch-icon:hover{background:rgba(255,255,255,.25)}
+.ch-avatar{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;overflow:hidden}
+.ch-avatar img{width:100%;height:100%;object-fit:cover}
+.ch-info{flex:1;min-width:0;cursor:pointer}
+.ch-name{font-size:15px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ch-status{font-size:11px;opacity:.9;display:flex;align-items:center;gap:.35rem}
+.ch-dot{width:8px;height:8px;border-radius:50%;background:#94a3b8;display:inline-block}
+.ch-dot.online{background:#4ade80}
+.chat-body{flex:1;overflow-y:auto;padding:1rem .85rem;display:flex;flex-direction:column;gap:.4rem;background:var(--bg);background-image:radial-gradient(rgba(127,127,160,.06) 1px,transparent 1px);background-size:22px 22px}
+.chat-date{align-self:center;background:var(--card);color:var(--muted);font-size:10.5px;font-weight:700;padding:.2rem .7rem;border-radius:999px;box-shadow:var(--sh);margin:.3rem 0}
+.chat-input{display:flex;align-items:flex-end;gap:.35rem;padding:.5rem .6rem;background:var(--card);border-top:1px solid var(--border);flex-shrink:0}
+.ci-btn{background:transparent;border:none;font-size:20px;cursor:pointer;width:40px;height:40px;border-radius:50%;flex-shrink:0;color:var(--muted);display:flex;align-items:center;justify-content:center}
+.ci-btn:hover{background:rgba(127,127,160,.12)}
+.ci-btn.rec{color:#fff;background:var(--red);animation:_pulse 1.2s infinite}
+.ci-text{flex:1;resize:none;border:1.5px solid var(--border);border-radius:20px;padding:.55rem .9rem;font:inherit;font-size:14px;max-height:120px;background:var(--bg);color:var(--text);outline:none;line-height:1.4}
+.ci-text:focus{border-color:var(--brand)}
+.ci-send{background:linear-gradient(135deg,var(--brand),var(--accent));color:#fff;border:none;width:42px;height:42px;border-radius:50%;font-size:18px;cursor:pointer;flex-shrink:0;transition:all .15s}
+.ci-send:disabled{opacity:.4;cursor:not-allowed}
+.ci-send:not(:disabled):hover{transform:scale(1.05)}
+.chat-pip{position:absolute;top:64px;right:14px;width:180px;background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:var(--sh2);z-index:12}
+.pip-head{display:flex;align-items:center;justify-content:space-between;padding:.3rem .5rem;font-size:11px;font-weight:800;color:var(--muted);background:var(--bg)}
+.pip-head button{border:none;background:none;cursor:pointer;color:var(--muted);font-size:13px}
+.pip-empty{padding:1.2rem;text-align:center;font-size:22px;color:#94a3b8}
+.pip-empty span{font-size:10px}
+/* bulles enrichies */
+.bubble .btype{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;opacity:.65;margin-left:.3rem}
+.bubble .bticks{font-size:11px;opacity:.75;margin-left:.3rem}
+.bubble img.bimg{max-width:200px;border-radius:9px;margin-top:.3rem;display:block;cursor:pointer}
+.bubble .bvoice{display:flex;align-items:center;gap:.4rem;font-size:13px;margin-top:.2rem;cursor:pointer;opacity:.85}
+
 /* ══ DIALOGUE / SESSION ══════════════════════════════════ */
 .role-grid{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
 .role-opt{display:flex;flex-direction:column;align-items:center;gap:.3rem;padding:.9rem .5rem;border:2px solid var(--border);border-radius:12px;cursor:pointer;background:var(--card);transition:all .15s;text-align:center}
@@ -1491,38 +1525,44 @@ body.dark .ai-ic,body.dark .hist-ic,body.dark .feat-ic,body.dark .qa-ic{filter:b
 
     <!-- ÉTAPE 3 : échange en direct -->
     <div id="dlgLive" style="display:none">
-      <div class="room-bar">
-        <div class="rb-info">
-          <span class="rb-code" id="roomCodeShow">—</span>
-          <span class="rb-peers" id="roomPeers">en solo</span>
-        </div>
-        <div class="rb-acts">
-          <button class="av-btn" id="btnRoomShare" onclick="roomShare()">🔗 Partager</button>
-          <button class="av-btn" onclick="roomLeave()">✕ Quitter</button>
-        </div>
-      </div>
-      <div class="mode-hint" id="roomHint"></div>
+      <div class="chat-wrap">
 
-      <div class="listen-card" id="listenCard">
-        <div class="listen-live" id="listenLive">Appuyez sur le micro et parlez, ou tapez votre message.</div>
-        <button class="mic-btn" id="micBtn" onclick="toggleListen()">
-          <span id="micIcon">🎙️</span><span id="micLabel">Parler</span>
-        </button>
-        <div class="listen-manual" id="listenManual" style="display:flex">
-          <input id="manualText" type="text" placeholder="Écrire un message…" onkeydown="if(event.key==='Enter')sendManual()">
-          <button onclick="sendManual()">Envoyer</button>
+        <!-- Header type WhatsApp -->
+        <div class="chat-head">
+          <button class="ch-icon" onclick="roomLeave()" title="Retour" aria-label="Retour">‹</button>
+          <div class="ch-avatar" id="chAvatar">👤</div>
+          <div class="ch-info" onclick="_chatMenu()">
+            <div class="ch-name" id="chName">En attente…</div>
+            <div class="ch-status"><span class="ch-dot" id="chDot"></span><span id="chStatus">Session —</span></div>
+          </div>
+          <button class="ch-icon" id="btnRoomShare" onclick="roomShare()" title="Partager" aria-label="Partager">🔗</button>
+          <button class="ch-icon" onclick="_chatMenu()" title="Menu" aria-label="Menu">⋮</button>
         </div>
-        <p style="font-size:11px;color:var(--muted);margin:0;text-align:center">🤟 Pour signer : onglet <strong>Caméra</strong> — vos phrases sont envoyées automatiquement dans la session.</p>
-      </div>
 
-      <div class="conv-card">
-        <div class="conv-hdr">
-          <span>💬 Échange</span>
-          <button onclick="clearConversation()" title="Effacer">🗑 Effacer</button>
+        <!-- Avatar PiP (mode avatar) -->
+        <div class="chat-pip" id="chatPip" style="display:none">
+          <div class="pip-head"><span>🧑 Avatar</span><button onclick="chatAvatarMode()" aria-label="Fermer">✕</button></div>
+          <model-viewer id="pipMv" src="/avatar/model.glb" camera-controls autoplay disable-zoom
+            style="width:100%;height:150px;background:#0d0f16" alt="Avatar"></model-viewer>
+          <div class="pip-empty" id="pipEmpty">🧑‍🦱<br><span>Avatar non configuré</span></div>
         </div>
-        <div class="conv-body" id="convBody">
-          <div class="conv-empty" id="convEmpty">Les messages apparaîtront ici.</div>
+
+        <!-- Zone messages -->
+        <div class="chat-body" id="convBody">
+          <div class="conv-empty" id="convEmpty">Les messages apparaîtront ici. 👋</div>
         </div>
+
+        <!-- Zone de saisie (toutes les actions restent ici) -->
+        <div class="chat-input">
+          <button class="ci-btn" onclick="chatAttach()" title="Photo" aria-label="Joindre une photo">📎</button>
+          <button class="ci-btn" id="ciVoice" onclick="chatVoice()" title="Message vocal" aria-label="Message vocal">🎙️</button>
+          <button class="ci-btn" onclick="chatGesture()" title="Signer (caméra)" aria-label="Signer">📷</button>
+          <button class="ci-btn" id="ciAvatar" onclick="chatAvatarMode()" title="Mode avatar" aria-label="Mode avatar" style="display:none">🌐</button>
+          <textarea id="chatInput" class="ci-text" rows="1" maxlength="2000" placeholder="Écrire un message…"
+            oninput="_chatGrow(this)" onkeydown="_chatKey(event)"></textarea>
+          <button class="ci-send" id="ciSend" onclick="chatSend()" title="Envoyer" aria-label="Envoyer" disabled>➤</button>
+        </div>
+        <input type="file" id="chatFile" accept="image/*" style="display:none" onchange="_chatFilePicked(this)">
       </div>
     </div>
 
@@ -3513,12 +3553,20 @@ async function roomJoinFromInput() {
   if (!v) { appLog('warn', 'Entrez un code de session'); return; }
   await _roomEnter(v);
 }
+function _chatHead(name, status, online, avatar) {
+  var e;
+  if (e = document.getElementById('chName')) e.textContent = name;
+  if (e = document.getElementById('chStatus')) e.textContent = status;
+  if (e = document.getElementById('chDot')) e.className = 'ch-dot' + (online ? ' online' : '');
+  if (e = document.getElementById('chAvatar')) e.textContent = avatar || '👤';
+  // Mode avatar visible seulement pour les rôles qui signent
+  var ab = document.getElementById('ciAvatar');
+  if (ab) ab.style.display = (!_statusByKey(userStatus).canSpeak) ? 'flex' : 'none';
+}
 function roomSolo() {
   _room = null; _stopRoomPoll(); _showDlgLive(true);
-  var e;
-  if (e = document.getElementById('roomCodeShow')) e.textContent = 'Solo';
-  if (e = document.getElementById('roomPeers')) e.textContent = 'un seul appareil';
-  if (e = document.getElementById('btnRoomShare')) e.style.display = 'none';
+  var sh = document.getElementById('btnRoomShare'); if (sh) sh.style.display = 'none';
+  _chatHead('Mode solo', 'Deux personnes, un appareil', false, '👥');
   appLog('info', 'Mode solo — deux personnes, un appareil');
 }
 async function _roomEnter(code) {
@@ -3532,9 +3580,8 @@ async function _roomEnter(code) {
     if (r && r.pid) _roomPid = r.pid;
   } catch(e) { appLog('err', 'Connexion à la session impossible : ' + e.message); return; }
   _showDlgLive(true);
-  var e;
-  if (e = document.getElementById('roomCodeShow')) e.textContent = code;
-  if (e = document.getElementById('btnRoomShare')) e.style.display = '';
+  var sh = document.getElementById('btnRoomShare'); if (sh) sh.style.display = 'flex';
+  _chatHead('Session ' + code, 'En attente de l\'autre personne…', false, '🔗');
   appLog('ok', 'Session ' + code + ' — partagez le code avec l\'autre personne');
   if (typeof recordEvent === 'function') recordEvent('🔗', 'Session ouverte', code);
   _startRoomPoll();
@@ -3562,10 +3609,13 @@ async function _roomTick() {
       _renderIncoming(m);
     });
     var others = (r.participants || []).filter(function(p) { return p.pid !== _roomPid; });
-    var e = document.getElementById('roomPeers');
-    if (e) e.textContent = others.length
-      ? (others.length + ' connecté(s) · ' + others.map(function(p) { return _statusByKey(p.role).icon; }).join(' '))
-      : 'en attente de l\'autre personne…';
+    if (others.length) {
+      var o = others[0], os = _statusByKey(o.role);
+      _chatHead((o.name && o.name !== '?' ? o.name : os.name) + ' · Session ' + _room,
+                'En ligne · ' + os.name, true, os.icon);
+    } else {
+      _chatHead('Session ' + _room, 'En attente de l\'autre personne…', false, '🔗');
+    }
   } catch(e) {}
 }
 function _renderIncoming(m) {
@@ -3589,6 +3639,91 @@ function roomSend(text, kind) {
 // Émission depuis mes signes (caméra) / ma voix / mon texte.
 function _emitSign(text) { if (_room) roomSend(text, 'sign'); else addConv('me', 'sign', text); }
 function _emitVoice(text) { if (_room) roomSend(text, 'speech'); else addConv('other', 'speech', text); }
+
+/* ══ ZONE DE SAISIE DU CHAT (toutes les actions restent dans le chat) ══ */
+function _chatGrow(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  var s = document.getElementById('ciSend'); if (s) s.disabled = !el.value.trim();
+}
+function _chatKey(ev) {
+  if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); chatSend(); }
+}
+function chatSend() {
+  var el = document.getElementById('chatInput'); if (!el) return;
+  var t = el.value.trim(); if (!t) return;
+  roomSend(t, 'text');                 // bulle 'moi' + relais si session
+  if (_avatarChat) _avatarSay(t);       // mode avatar : l'avatar joue/parle
+  el.value = ''; _chatGrow(el); el.focus();
+}
+function _chatMenu() { if (confirm('Effacer toute la conversation ?')) clearConversation(); }
+
+/* 📎 Photo (compressée puis relayée) */
+function chatAttach() { var f = document.getElementById('chatFile'); if (f) { f.value = ''; f.click(); } }
+function _chatFilePicked(input) {
+  var file = input.files && input.files[0]; if (!file) return;
+  if (!/^image\//.test(file.type)) { appLog('warn', 'Choisissez une image'); return; }
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    var img = new Image();
+    img.onload = function() {
+      var max = 480, w = img.width, h = img.height;
+      if (w > h && w > max) { h = Math.round(h * max / w); w = max; }
+      else if (h > max) { w = Math.round(w * max / h); h = max; }
+      var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(img, 0, 0, w, h);
+      var durl = cv.toDataURL('image/jpeg', 0.55);
+      roomSend(durl, 'photo');
+      appLog('ok', 'Photo envoyée (' + Math.round(durl.length / 1024) + ' Ko)');
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+/* 🎙️ Message vocal (transcription en direct) */
+function chatVoice() {
+  if (!_SR) { appLog('warn', 'Reconnaissance vocale non supportée — tapez le message'); return; }
+  var el = document.getElementById('chatInput');
+  if (_listening) {
+    _stopListen();
+    if (el) el.placeholder = 'Écrire un message…';
+  } else {
+    _startListen();
+    if (el) el.placeholder = '🎧 À l\'écoute… parlez';
+  }
+  var b = document.getElementById('ciVoice'); if (b) b.classList.toggle('rec', _listening);
+}
+
+/* 📷 Signer : bascule vers la caméra (les phrases partent dans la session) */
+function chatGesture() {
+  appLog('info', 'Caméra : signez — vos phrases sont envoyées dans la session en cours');
+  switchTabByName('cam');
+  if (!running) startCam();
+}
+
+/* 🌐 Mode avatar (rôles qui signent) : l'avatar joue le texte tapé */
+var _avatarChat = false, _chatPipInit = false;
+function chatAvatarMode() {
+  _avatarChat = !_avatarChat;
+  var pip = document.getElementById('chatPip'); if (pip) pip.style.display = _avatarChat ? 'block' : 'none';
+  var b = document.getElementById('ciAvatar'); if (b) b.classList.toggle('on', _avatarChat);
+  if (_avatarChat) { _initChatPip(); appLog('info', 'Mode avatar activé — en envoyant, l\'avatar joue le message'); }
+}
+function _initChatPip() {
+  if (_chatPipInit) return; _chatPipInit = true;
+  var mv = document.getElementById('pipMv'), em = document.getElementById('pipEmpty');
+  _loadScriptModule('https://cdn.jsdelivr.net/npm/@google/model-viewer@4.0.0/dist/model-viewer.min.js').catch(function() {});
+  if (mv) {
+    mv.addEventListener('load', function() { mv.style.display = 'block'; if (em) em.style.display = 'none'; });
+    mv.addEventListener('error', function() { mv.style.display = 'none'; if (em) em.style.display = 'block'; });
+  }
+}
+function _avatarSay(text) {
+  speakFR(text);
+  var mv = document.getElementById('pipMv');
+  if (mv && mv.style.display !== 'none') { try { mv.currentTime = 0; if (mv.play) mv.play(); } catch(e) {} }
+}
 
 /* ── Changement de caméra (avant / arrière) ── */
 var _facing = 'user';
@@ -3750,22 +3885,45 @@ function _fmtTime(ms) {
   function p(n){ return (n<10?'0':'')+n; }
   return p(d.getHours()) + ':' + p(d.getMinutes());
 }
+var _KIND_BADGE = { text:'', speech:'Voix', sign:'Signe', photo:'Photo', avatar:'Avatar' };
+function _dayLabel(ms) {
+  var d = new Date(ms), n = new Date();
+  var day = function(x){ return x.getFullYear()+'-'+x.getMonth()+'-'+x.getDate(); };
+  if (day(d) === day(n)) return "Aujourd'hui";
+  var y = new Date(n.getTime() - 86400000);
+  if (day(d) === day(y)) return 'Hier';
+  return d.toLocaleDateString('fr-FR', { day:'numeric', month:'long' });
+}
+var _lastBubbleDay = null;
 function _appendConvBubble(e) {
   var body = document.getElementById('convBody');
   if (!body) return;
   var empty = document.getElementById('convEmpty');
   if (empty) empty.remove();
+  // séparateur de date
+  var dl = _dayLabel(e.t);
+  if (dl !== _lastBubbleDay) {
+    _lastBubbleDay = dl;
+    var sep = document.createElement('div');
+    sep.className = 'chat-date'; sep.textContent = dl;
+    body.appendChild(sep);
+  }
   var b = document.createElement('div');
   b.className = 'bubble ' + (e.who === 'me' ? 'me' : 'other');
-  var icon = e.kind === 'sign' ? '🤟' : '🎙️';
-  var label = e.who === 'me' ? 'Moi' : 'L\'autre';
-  var replay = (e.who === 'me')
-    ? ' <span class="breplay" title="Relire" onclick="speakFR(' + _jsQuote(e.text) + ')">🔊</span>'
-    : '';
-  var emo = _emojiForText(e.text);
-  b.innerHTML = '<div class="bmeta">' + icon + ' ' + label + ' · ' + _fmtTime(e.t) + replay + '</div>'
-    + _escapeHtml(e.text)
-    + (emo ? '<div class="emoji-row">' + emo + '</div>' : '');
+  var badge = _KIND_BADGE[e.kind] || '';
+  var ticks = (e.who === 'me') ? '<span class="bticks">✓✓</span>' : '';
+  var replay = (e.who === 'me' && e.kind !== 'photo')
+    ? ' <span class="breplay" title="Relire" onclick="speakFR(' + _jsQuote(e.text) + ')">🔊</span>' : '';
+  var head = '<div class="bmeta">' + _fmtTime(e.t)
+    + (badge ? '<span class="btype">' + badge + '</span>' : '') + ticks + replay + '</div>';
+  var content;
+  if (e.kind === 'photo') {
+    content = '<img class="bimg" src="' + e.text + '" alt="photo" onclick="window.open(this.src)">';
+  } else {
+    var emo = _emojiForText(e.text);
+    content = _escapeHtml(e.text) + (emo ? '<div class="emoji-row">' + emo + '</div>' : '');
+  }
+  b.innerHTML = head + content;
   body.appendChild(b);
   body.scrollTop = body.scrollHeight;
 }
@@ -3780,8 +3938,9 @@ function _renderConvAll() {
   var body = document.getElementById('convBody');
   if (!body) return;
   body.innerHTML = '';
+  _lastBubbleDay = null;
   if (!CONV.length) {
-    body.innerHTML = '<div class="conv-empty" id="convEmpty">La conversation apparaîtra ici — signes reconnus et paroles transcrites.</div>';
+    body.innerHTML = '<div class="conv-empty" id="convEmpty">Les messages apparaîtront ici. 👋</div>';
     return;
   }
   CONV.forEach(_appendConvBubble);

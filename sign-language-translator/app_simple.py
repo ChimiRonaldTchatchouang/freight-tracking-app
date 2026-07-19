@@ -536,6 +536,11 @@ main{padding-top:calc(var(--hh) + 1.25rem);padding-bottom:1.25rem;
 .btn-alpha.on{background:linear-gradient(135deg,var(--brand),var(--accent));color:#fff;border-color:transparent}
 .btn-ai{background:linear-gradient(135deg,#faf5ff,#f3e8ff);color:#6b21a8;border:1px solid #d8b4fe}
 .btn-ai:hover{filter:brightness(1.03)}
+.btn-comm{background:linear-gradient(135deg,#fff7ed,#ffedd5);color:#9a3412;border:1px solid #fdba74}
+.btn-comm.on{background:linear-gradient(135deg,var(--green),#047857);color:#fff;border-color:transparent}
+.emoji-row{font-size:22px;letter-spacing:.18em;text-align:center;min-height:0;line-height:1.4;transition:all .2s}
+.emoji-row:not(:empty){margin:.2rem 0 .1rem}
+.bubble .emoji-row{font-size:18px;text-align:left;margin-top:.25rem}
 .natural-sent{background:linear-gradient(135deg,#f5f3ff,#ede9fe);border:1px solid #ddd6fe;border-radius:10px;padding:.7rem .85rem;font-size:14px;color:#5b21b6;font-weight:600;line-height:1.4}
 body.dark .natural-sent{background:#1e1633;border-color:#4c1d95;color:#c4b5fd}
 .btn-speak:hover{background:var(--green);color:#fff;border-color:var(--green)}
@@ -1227,8 +1232,10 @@ body.dark .ai-ic,body.dark .hist-ic,body.dark .feat-ic,body.dark .qa-ic{filter:b
     </div>
     <div class="sb-foot">
       <button class="sb-theme" onclick="toggleTheme()"><span id="themeIcon">🌙</span> <span id="themeLabel">Sombre</span></button>
-      <div class="mp-pill loading" id="mpPill">⏳ …</div>
+      <button class="sb-theme" onclick="signOut()" title="Déconnexion" style="flex:0 0 auto">↩</button>
     </div>
+    <button class="sb-item" onclick="signOut()" style="margin-top:.4rem;color:#fca5a5"><span class="sb-ic">🚪</span> Déconnexion</button>
+    <div class="mp-pill loading" id="mpPill" style="align-self:center;margin-top:.5rem">⏳ …</div>
   </div>
 </aside>
 
@@ -1366,7 +1373,9 @@ body.dark .ai-ic,body.dark .hist-ic,body.dark .feat-ic,body.dark .qa-ic{filter:b
         <div class="cam-extra">
           <button class="btn btn-ai btn-block" id="btnMakeSentence" onclick="makeSentence()">✨ Former une phrase (IA)</button>
           <div id="naturalSent" class="natural-sent" style="display:none"></div>
-          <button class="btn btn-speak btn-block" onclick="speakSentence()">🔊 Lire la phrase à voix haute</button>
+          <div id="naturalEmoji" class="emoji-row"></div>
+          <button class="btn btn-speak btn-block" onclick="speakSentence()">🔊 Lire mot à mot</button>
+          <button class="btn btn-comm btn-block" id="btnComm" onclick="toggleCommMode()">💬 Mode communication (lecture IA auto)</button>
           <button class="btn btn-alpha btn-block" id="btnAlpha" onclick="toggleAlphabetMode()">🔤 Mode alphabet (épeler)</button>
           <button class="btn btn-learn btn-block" id="btnLearn" onclick="captureSign()" style="display:none">📚 Apprendre ce signe</button>
         </div>
@@ -1662,6 +1671,10 @@ body.dark .ai-ic,body.dark .hist-ic,body.dark .feat-ic,body.dark .qa-ic{filter:b
       <div class="set-row">
         <div><div class="sr-l">Déconnexion</div><div class="sr-d">Vous reviendrez à l'écran de connexion</div></div>
         <button class="btn-danger" onclick="signOut()">Se déconnecter</button>
+      </div>
+      <div class="set-row">
+        <div><div class="sr-l">Réinitialiser la démo (dev)</div><div class="sr-d">Efface session + intégration et retourne à l'accueil (pour re-tester le parcours)</div></div>
+        <button class="btn-hero ghost" style="padding:.5rem 1rem;font-size:13px" onclick="devReset()">Réinitialiser</button>
       </div>
     </div>
   </div>
@@ -1959,7 +1972,13 @@ function _applySession(){
 
 function signOut(){
   _session=null; try{ localStorage.removeItem('sv_session'); }catch(e){}
-  closeUserMenu(); showScreen('landing'); appLog('info','Déconnexion');
+  closeUserMenu(); closeSidebar(); showScreen('landing'); appLog('info','Déconnexion');
+}
+function devReset(){
+  _session=null;
+  try{ localStorage.removeItem('sv_session'); localStorage.removeItem('sv_onboarded'); }catch(e){}
+  closeUserMenu(); closeSidebar(); showScreen('landing');
+  appLog('info','Réinitialisation (dev) — retour à l\'accueil, parcours complet à re-tester');
 }
 
 function toggleUserMenu(ev){ if(ev) ev.stopPropagation(); var d=document.getElementById('userDropdown'); if(d) d.classList.toggle('open'); }
@@ -3136,17 +3155,26 @@ function _addWord(sign) {
     + '<button onclick="_removeWord(' + idx + ')" title="Supprimer ce mot">✕</button>';
   document.getElementById('sentWrap').appendChild(chip);
   _updatePredictions();
-  // Inactivity auto-read (3s after last sign, ≥2 mots)
+  _showSentenceEmoji();
+  // Auto-lecture après une pause. Deux modes :
+  //  • défaut         : lecture mot à mot des gloses (~3 s d'inactivité)
+  //  • communication  : l'IA formule la phrase et la lit (~5 s, temps de finir)
   clearTimeout(_inactivityTimer);
+  var delay = _commMode ? 5000 : 3000;
   _inactivityTimer = setTimeout(function() {
-    if (sentence.length < 2) return;
-    var keys = _sentenceObjs.map(function(s) { return s.key; });
-    var exact = _exactPhraseMatch(keys);
-    var txt = exact ? exact.fr : sentence.join(', ');
-    appLog('info', '⏱ Lecture auto : «' + txt + '»');
-    speakFR(txt);
-    addConv('me', 'sign', txt);
-  }, 3000);
+    if (sentence.length < 1) return;
+    if (_commMode) {
+      appLog('info', '💬 Mode communication : l\'IA formule la phrase…');
+      makeSentence();                 // forme la phrase IA, la lit et affiche les emojis
+    } else if (sentence.length >= 2) {
+      var keys = _sentenceObjs.map(function(s) { return s.key; });
+      var exact = _exactPhraseMatch(keys);
+      var txt = exact ? exact.fr : sentence.join(' ');
+      appLog('info', '⏱ Lecture auto mot à mot : «' + txt + '»');
+      speakWordByWord(txt);
+      addConv('me', 'sign', txt);
+    }
+  }, delay);
 }
 
 function _removeWord(idx) {
@@ -3178,6 +3206,8 @@ function clearSentence() {
   clearTimeout(_inactivityTimer); clearTimeout(_phraseCompleteTimer);
   _rebuildSent();
   _updatePredictions();
+  var ne = document.getElementById('naturalEmoji'); if (ne) ne.textContent = '';
+  var ns = document.getElementById('naturalSent'); if (ns) ns.style.display = 'none';
   appLog('info', 'Phrase effacée');
 }
 
@@ -3208,15 +3238,79 @@ function speakFR(text) {
   speechSynthesis.speak(u);
 }
 
+// Lecture mot à mot : chaque mot est prononcé séparément (petite pause naturelle).
+function speakWordByWord(text) {
+  if (!window.speechSynthesis || !text) return;
+  speechSynthesis.cancel();
+  var words = String(text).split(/[\s,]+/).filter(Boolean);
+  words.forEach(function(w) {
+    var u = new SpeechSynthesisUtterance(w);
+    u.lang = 'fr-FR'; u.rate = (typeof _ttsRate === 'number' ? _ttsRate : 0.9); u.pitch = 1; u.volume = 1;
+    if (_ttsVoice) u.voice = _ttsVoice;
+    speechSynthesis.speak(u);
+  });
+}
+
 function speakSentence() {
   if (!sentence.length) { speakFR('Aucun mot'); return; }
   var keys = _sentenceObjs.map(function(s) { return s.key; });
   var exact = _exactPhraseMatch(keys);
-  var txt = exact ? exact.fr : sentence.join(', ');
-  appLog('info', '🔊 Lecture : «' + txt + '»' + (exact ? ' (phrase naturelle)' : ''));
-  speakFR(txt);
+  var txt = exact ? exact.fr : sentence.join(' ');
+  appLog('info', '🔊 Lecture mot à mot : «' + txt + '»');
+  speakWordByWord(txt);
   addConv('me', 'sign', txt);
-  if (typeof recordEvent === 'function') recordEvent('🔊', 'Phrase lue à voix haute', txt);
+  if (typeof recordEvent === 'function') recordEvent('🔊', 'Phrase lue (mot à mot)', txt);
+}
+
+/* ── Mode communication : lecture IA automatique ── */
+var _commMode = false;
+function toggleCommMode() {
+  _commMode = !_commMode;
+  var b = document.getElementById('btnComm');
+  if (b) { b.classList.toggle('on', _commMode); b.textContent = _commMode ? '💬 Communication : ACTIVÉ (lecture IA auto)' : '💬 Mode communication (lecture IA auto)'; }
+  appLog('info', 'Mode communication ' + (_commMode ? 'activé — l\'IA formulera et lira la phrase ~5 s après vos signes' : 'désactivé'));
+}
+
+/* ── Rétro-traduction : emojis correspondant aux mots ── */
+var _EMOJI_MAP = null;
+function _buildEmojiMap() {
+  _EMOJI_MAP = {};
+  try { SIGNS.forEach(function(s) { _EMOJI_MAP[s.fr.toLowerCase()] = s.emoji; }); } catch(e) {}
+  var extra = {
+    'bonjour':'👋','salut':'👋','coucou':'👋','au revoir':'👋','merci':'🙏','pardon':'🙏',
+    's\'il vous plaît':'🙏','oui':'✅','non':'❌','peut-être':'🤔',
+    'je':'🙋','j\'':'🙋','moi':'🙋','tu':'👉','toi':'👉','vous':'👉','il':'👤','elle':'👩','nous':'👥','on':'👥','ils':'👥',
+    'manger':'🍽️','mange':'🍽️','boire':'🥤','bois':'🥤','eau':'💧','faim':'🍽️','soif':'🥤',
+    'maison':'🏠','chez':'🏠','école':'🏫','travail':'💼','travailler':'💼','argent':'💰',
+    'aimer':'❤️','aime':'❤️','amour':'❤️','vouloir':'🙏','veux':'🙏','voudrais':'🙏','besoin':'🙏',
+    'aller':'➡️','vais':'➡️','va':'➡️','venir':'⬅️','viens':'⬅️',
+    'bien':'👍','bon':'👍','super':'👍','parfait':'👌','mal':'👎','mauvais':'👎',
+    'grand':'🔼','petit':'🔽','chaud':'🔥','froid':'❄️',
+    'heureux':'😊','content':'😊','contente':'😊','joie':'😊','triste':'😢','fatigué':'😴','fatiguée':'😴','malade':'🤒',
+    'monde':'🌍','dieu':'🙏','fort':'💪','conduire':'🚗','voiture':'🚗','arbre':'🌳',
+    'comprendre':'💡','comprends':'💡','savoir':'🧠','sais':'🧠','promettre':'🤝','donner':'🎁','donne':'🎁',
+    'comment':'❓','pourquoi':'❓','quoi':'❓','que':'❓','qui':'❓','où':'📍','quand':'🕐',
+    'temps':'🕐','jour':'☀️','aujourd\'hui':'📅','nuit':'🌙','matin':'🌅','soir':'🌆','demain':'📅','hier':'📅',
+    'famille':'👪','ami':'🤝','amie':'🤝','parler':'💬','écouter':'👂','voir':'👁️','regarder':'👁️',
+    'téléphone':'📱','téléphoner':'📱','message':'💬','question':'❓','nom':'📛','âge':'🎂',
+    'chat':'🐱','chien':'🐶','livre':'📖','musique':'🎵','beau':'✨','belle':'✨','nouveau':'🆕'
+  };
+  Object.keys(extra).forEach(function(k) { if (!_EMOJI_MAP[k]) _EMOJI_MAP[k] = extra[k]; });
+}
+function _emojiForText(txt) {
+  if (!_EMOJI_MAP) _buildEmojiMap();
+  if (!txt) return '';
+  return String(txt).toLowerCase().split(/\s+/).map(function(w) {
+    var k = w.replace(/[.,!?;:«»"'()]/g, '');
+    return _EMOJI_MAP[k] || '';
+  }).filter(Boolean).join(' ');
+}
+function _showSentenceEmoji() {
+  var el = document.getElementById('naturalEmoji');
+  if (!el) return;
+  // pendant la construction : emojis des signes déjà captés
+  if (!sentence.length) { el.textContent = ''; return; }
+  el.textContent = _sentenceObjs.map(function(s) { return s.emoji || ''; }).filter(Boolean).join(' ');
 }
 
 /* ── Modèle de langage : gloses → phrase naturelle ── */
@@ -3256,6 +3350,7 @@ async function makeSentence() {
     }).then(function(x) { return x.json(); });
     if (r.result) {
       _showNaturalSent(r.result, false);
+      var em = document.getElementById('naturalEmoji'); if (em) em.textContent = _emojiForText(r.result);
       var av = document.getElementById('avatarText'); if (av) av.value = r.result;
       speakFR(r.result);
       addConv('me', 'sign', r.result);
@@ -3481,8 +3576,10 @@ function _appendConvBubble(e) {
   var replay = (e.who === 'me')
     ? ' <span class="breplay" title="Relire" onclick="speakFR(' + _jsQuote(e.text) + ')">🔊</span>'
     : '';
+  var emo = _emojiForText(e.text);
   b.innerHTML = '<div class="bmeta">' + icon + ' ' + label + ' · ' + _fmtTime(e.t) + replay + '</div>'
-    + _escapeHtml(e.text);
+    + _escapeHtml(e.text)
+    + (emo ? '<div class="emoji-row">' + emo + '</div>' : '');
   body.appendChild(b);
   body.scrollTop = body.scrollHeight;
 }

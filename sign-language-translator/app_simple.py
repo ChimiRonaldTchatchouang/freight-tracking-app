@@ -532,6 +532,8 @@ main{padding-top:calc(var(--hh) + 1.25rem);padding-bottom:1.25rem;
 .btn-ghost{background:#f8f9fb;color:var(--muted);border:1px solid var(--border)}
 .btn-ghost:hover{background:#ede9fe;color:var(--brand);border-color:#c4b5f4}
 .btn-speak{background:linear-gradient(135deg,#ecfdf5,#d1fae5);color:#065f46;border:1px solid #6ee7b7}
+.btn-alpha{background:linear-gradient(135deg,#eff6ff,#dbeafe);color:#1e40af;border:1px solid #93c5fd}
+.btn-alpha.on{background:linear-gradient(135deg,var(--brand),var(--accent));color:#fff;border-color:transparent}
 .btn-speak:hover{background:var(--green);color:#fff;border-color:var(--green)}
 .btn-block{width:100%}
 .cam-btns{display:flex;gap:.55rem;padding:.75rem}
@@ -1348,6 +1350,7 @@ body.dark .ai-ic,body.dark .hist-ic,body.dark .feat-ic,body.dark .qa-ic{filter:b
         </div>
         <div class="cam-extra">
           <button class="btn btn-speak btn-block" onclick="speakSentence()">🔊 Lire la phrase à voix haute</button>
+          <button class="btn btn-alpha btn-block" id="btnAlpha" onclick="toggleAlphabetMode()">🔤 Mode alphabet (épeler)</button>
           <button class="btn btn-learn btn-block" id="btnLearn" onclick="captureSign()" style="display:none">📚 Apprendre ce signe</button>
         </div>
       </div>
@@ -2311,6 +2314,98 @@ var ALPHABET = [
   { l:'Z', desc:'Index tendu traçant un « Z »',                         share:'index + mouvement' }
 ];
 
+/* ══ CLASSIFIEUR D'ALPHABET (21 points 3D) — bêta ══════════
+   Utilise les angles des articulations et la géométrie de la main pour
+   distinguer les lettres de la dactylologie, au-delà du simple levé/replié.
+   Certaines lettres à forme de poing (M/N/T) ou dynamiques (J/Z) restent
+   approximatives. */
+function _d2(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+function _jointAngle(a, b, c) {
+  var v1x = a.x - b.x, v1y = a.y - b.y, v2x = c.x - b.x, v2y = c.y - b.y;
+  var dot = v1x * v2x + v1y * v2y, m = Math.hypot(v1x, v1y) * Math.hypot(v2x, v2y);
+  if (!m) return 180;
+  return Math.acos(Math.max(-1, Math.min(1, dot / m))) * 180 / Math.PI;
+}
+// Retourne l'état de chaque doigt : angle à l'articulation PIP (≈180 = tendu).
+function _fingerAngles(lm) {
+  return {
+    thumb:  _jointAngle(lm[2], lm[3], lm[4]),
+    index:  _jointAngle(lm[5], lm[6], lm[8]),
+    middle: _jointAngle(lm[9], lm[10], lm[12]),
+    ring:   _jointAngle(lm[13], lm[14], lm[16]),
+    pinky:  _jointAngle(lm[17], lm[18], lm[20])
+  };
+}
+var _ALPHA_EMO = { A:'🅰',B:'🅱',C:'🅲',D:'🅳',E:'🅴',F:'🅵',G:'🅶',H:'🅷',I:'🅸',
+  J:'🅹',K:'🅺',L:'🅻',M:'🅼',N:'🅽',O:'🅾',P:'🅿',Q:'🆀',R:'🆁',S:'🆂',T:'🆃',
+  U:'🆄',V:'🆅',W:'🆆',X:'🆇',Y:'🆈',Z:'🆉' };
+function _letterMeta(l) {
+  for (var i = 0; i < ALPHABET.length; i++) if (ALPHABET[i].l === l) return ALPHABET[i];
+  return { l: l, desc: 'Lettre ' + l };
+}
+function classifyLetter(lm) {
+  if (!lm || lm.length < 21) return { sign: null, conf: 0, f: null };
+  var a = _fingerAngles(lm);
+  var scale = _d2(lm[0], lm[9]) || 0.001;
+  var EXT = 158;                         // doigt tendu si angle PIP > 158°
+  var iE = a.index > EXT, mE = a.middle > EXT, rE = a.ring > EXT, pE = a.pinky > EXT;
+  var thumbExt = a.thumb > 150 && _d2(lm[4], lm[5]) > _d2(lm[3], lm[5]) * 1.05;
+  var cnt = (iE ? 1 : 0) + (mE ? 1 : 0) + (rE ? 1 : 0) + (pE ? 1 : 0);
+  var spread   = _d2(lm[8], lm[12]) / scale;    // écart index–majeur
+  var thumbIdx = _d2(lm[4], lm[8]) / scale;      // pouce–index (pince)
+  var thumbMid = _d2(lm[4], lm[12]) / scale;
+  // croisement index/majeur (R) : les bouts sont inversés par rapport aux bases
+  var crossed = (lm[8].x - lm[12].x) * (lm[5].x - lm[9].x) < 0;
+  // courbure moyenne des 4 doigts (pour C/O : ni tendus ni en poing serré)
+  var avgCurl = (a.index + a.middle + a.ring + a.pinky) / 4;
+  var L = null, conf = 78;
+
+  if (cnt === 4) {
+    L = 'B';
+  } else if (cnt === 3) {
+    if (iE && mE && rE) L = 'W';
+    else if (mE && rE && pE) { L = (thumbIdx < 0.55) ? 'F' : 'W'; }
+    else L = 'W';
+  } else if (cnt === 2) {
+    if (iE && mE) {
+      if (thumbExt && spread < 0.9) { L = 'K'; conf = 68; }
+      else if (crossed) L = 'R';
+      else if (spread > 0.75) L = 'V';
+      else L = 'U';
+    } else if (iE && pE) { L = null; }            // cornes : pas une lettre
+    else if ((iE || mE) && thumbExt) L = 'L';
+    else L = null;
+  } else if (cnt === 1) {
+    if (iE) { L = (thumbExt && _jointAngle(lm[4], lm[2], lm[8]) > 55) ? 'L' : 'D'; }
+    else if (pE) { L = thumbExt ? 'Y' : 'I'; }
+    else if (mE) L = 'D';
+    else L = null;
+  } else {                                        // cnt === 0 : main fermée / courbée
+    if (avgCurl > 105 && thumbIdx > 0.28 && thumbIdx < 0.75) L = 'C';   // main courbée ouverte
+    else if (thumbIdx < 0.3 && thumbMid < 0.35) L = 'O';               // bouts joints
+    else if (thumbExt) L = 'A';                                        // pouce sur le côté
+    else if (thumbIdx < 0.5) L = 'S';                                  // pouce devant
+    else L = 'E';
+    conf = 62;
+  }
+  if (!L) return { sign: null, conf: 0, f: a };
+  var meta = _letterMeta(L);
+  return {
+    sign: { key: 'L_' + L, emoji: _ALPHA_EMO[L] || '🔤', fr: L, en: L,
+            desc: 'Dactylologie — ' + (meta.desc || L), letter: true },
+    conf: conf,
+    f: { thumb: thumbExt, index: iE, middle: mE, ring: rE, pinky: pE,
+         thumbUp: false, thumbDown: false, palmW: spread }
+  };
+}
+var _alphabetMode = false;
+function toggleAlphabetMode() {
+  _alphabetMode = !_alphabetMode;
+  var b = document.getElementById('btnAlpha');
+  if (b) { b.classList.toggle('on', _alphabetMode); b.textContent = _alphabetMode ? '🔤 Mode alphabet : ACTIVÉ' : '🔤 Mode alphabet (épeler)'; }
+  appLog('info', 'Mode alphabet ' + (_alphabetMode ? 'activé — épelez lettre par lettre' : 'désactivé'));
+}
+
 function renderAlphabet() {
   var g = document.getElementById('alphaGrid');
   if (!g) return;
@@ -2792,6 +2887,22 @@ function _handleLandmarks(lms, ctx, cvs) {
     }
   }
 
+  var domLm0 = lms[0];
+  if (handCount >= 2 && lms[1][0].x < lms[0][0].x) domLm0 = lms[1];
+
+  // ── Mode alphabet (dactylologie) : on épelle lettre par lettre ──
+  if (_alphabetMode) {
+    var lr = classifyLetter(domLm0);
+    _onDetect(lr.sign, lr.conf, lr.f);
+    if (debugOn) {
+      var la = _fingerAngles(domLm0);
+      document.getElementById('dbgBox').innerHTML =
+        '🔤 ALPHABET<br>angles I:'+(la.index|0)+' M:'+(la.middle|0)+' R:'+(la.ring|0)+' P:'+(la.pinky|0)+' T:'+(la.thumb|0)+'<br>'+
+        '→ '+(lr.sign ? 'Lettre '+lr.sign.fr : '—');
+    }
+    return;
+  }
+
   if (handCount >= 2) {
     var bi = classifyBimanual(lms[0], lms[1]);
     if (bi.sign) {
@@ -2808,8 +2919,7 @@ function _handleLandmarks(lms, ctx, cvs) {
     }
   }
 
-  var domLm = lms[0];
-  if (handCount >= 2 && lms[1][0].x < lms[0][0].x) domLm = lms[1];
+  var domLm = domLm0;
   var r = classify(domLm);
   _onDetect(r.sign, r.conf, r.f);
   if (debugOn) {

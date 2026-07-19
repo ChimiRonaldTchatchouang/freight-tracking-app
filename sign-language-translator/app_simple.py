@@ -918,6 +918,16 @@ textarea{resize:vertical;min-height:100px;grid-column:1/-1}
   .app-nav .anav span{display:none}
   .lp-nav-links a:not(.btn-hero){display:none}
 }
+/* ══ AVATAR 3D ═══════════════════════════════════════════ */
+.avatar-pane{max-width:640px;margin:0 auto;padding:1rem}
+.avatar-stage{position:relative;border-radius:14px;overflow:hidden;box-shadow:var(--sh)}
+.avatar-empty{min-height:440px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:.5rem;background:radial-gradient(circle at 50% 30%,#1b2130,#0d0f16);border-radius:14px;color:#cbd5e1;padding:2rem}
+.avatar-empty h3{font-size:17px;font-weight:800;color:#fff}
+.avatar-empty p{font-size:13px;color:#94a3b8;max-width:38ch;line-height:1.55}
+.avatar-controls{display:flex;gap:.5rem;margin-top:.8rem}
+.avatar-controls input{flex:1;padding:.7rem .85rem;border:1.5px solid var(--border);border-radius:10px;font:inherit;font-size:14px;background:var(--card);color:var(--text)}
+.avatar-caption{margin-top:.6rem;font-size:14px;color:var(--brand);font-weight:700;min-height:1.3em;text-align:center}
+
 /* ══ ALPHABET LSF ════════════════════════════════════════ */
 .alpha-note{font-size:11px;color:var(--muted);line-height:1.55;margin-bottom:.75rem}
 .ref-item.alpha{position:relative;cursor:help}
@@ -1293,6 +1303,7 @@ body.dark .ai-ic,body.dark .hist-ic,body.dark .feat-ic,body.dark .qa-ic{filter:b
     <button class="tab-btn active" onclick="switchTab('cam',this)">📷<span class="tlab"> Caméra</span></button>
     <button class="tab-btn"        onclick="switchTab('talk',this)">💬<span class="tlab"> Dialogue</span></button>
     <button class="tab-btn"        onclick="switchTab('text',this)">📝<span class="tlab"> Texte</span></button>
+    <button class="tab-btn"        onclick="switchTab('avatar',this)">🧑<span class="tlab"> Avatar</span></button>
   </div>
 
 <main>
@@ -1515,6 +1526,28 @@ body.dark .ai-ic,body.dark .hist-ic,body.dark .feat-ic,body.dark .qa-ic{filter:b
   </div>
 </div>
 
+<!-- ══ AVATAR PANE ═══════════════════════════════════════════ -->
+<div id="pane-avatar" class="pane">
+  <div class="avatar-pane">
+    <div class="avatar-stage">
+      <model-viewer id="avatarMv" src="/avatar/model.glb" camera-controls autoplay
+        shadow-intensity="1" exposure="1.05" camera-orbit="0deg 90deg 2.2m"
+        style="width:100%;height:440px;background:radial-gradient(circle at 50% 30%,#1b2130,#0d0f16);border-radius:14px;display:none"></model-viewer>
+      <div class="avatar-empty" id="avatarEmpty">
+        <div style="font-size:56px">🧑‍🦱</div>
+        <h3>Avatar 3D — à configurer</h3>
+        <p>Déposez ici votre fichier <strong>.glb</strong> (exporté depuis Ready Player Me ou Hyper3D) : je le mettrai en ligne et l'animerai. Le lien d'espace de travail ne suffit pas — il me faut le modèle téléchargeable.</p>
+      </div>
+    </div>
+    <div class="avatar-controls">
+      <input id="avatarText" type="text" placeholder="Texte à faire dire par l'avatar…" onkeydown="if(event.key==='Enter')avatarSpeak()">
+      <button class="btn btn-primary" style="width:auto;padding:.7rem 1.2rem" onclick="avatarSpeak()">▶ Jouer</button>
+    </div>
+    <div class="avatar-caption" id="avatarCaption"></div>
+    <p style="font-size:11px;color:var(--muted);margin-top:.6rem;line-height:1.5">💡 L'avatar parle la phrase (synthèse vocale) et joue son animation. La performance LSF grammaticale complète nécessite des données d'animation de signes (étape suivante).</p>
+  </div>
+</div>
+
 </main>
 
 <!-- ══ STATUS MODAL ═════════════════════════════════════════ -->
@@ -1647,11 +1680,56 @@ function switchTab(name, btn) {
   document.querySelectorAll('.pane').forEach(function(p) { p.classList.remove('active'); });
   document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
   document.getElementById('pane-' + name).classList.add('active');
-  btn.classList.add('active');
+  if (btn) btn.classList.add('active');
   // Première ouverture du Dialogue sans statut configuré → propose la config
   if (name === 'talk' && !localStorage.getItem('lsf_status')) {
     setTimeout(openStatusModal, 250);
   }
+  if (name === 'avatar') _initAvatarViewer();
+}
+
+/* ── AVATAR 3D (model-viewer, chargé à la demande) ── */
+var _avatarViewerInit = false;
+function _loadScriptModule(src) {
+  return new Promise(function(resolve, reject) {
+    var s = document.createElement('script');
+    s.type = 'module'; s.src = src;
+    s.onload = resolve; s.onerror = function() { reject(new Error('load ' + src)); };
+    document.head.appendChild(s);
+  });
+}
+function _initAvatarViewer() {
+  if (_avatarViewerInit) return;
+  _avatarViewerInit = true;
+  var mv = document.getElementById('avatarMv');
+  var empty = document.getElementById('avatarEmpty');
+  if (mv) {
+    mv.addEventListener('load', function() {
+      mv.style.display = 'block';
+      if (empty) empty.style.display = 'none';
+      appLog('ok', '🧑 Avatar 3D chargé');
+    });
+    mv.addEventListener('error', function() {
+      mv.style.display = 'none';
+      if (empty) empty.style.display = 'flex';
+    });
+  }
+  _loadScriptModule('https://cdn.jsdelivr.net/npm/@google/model-viewer@4.0.0/dist/model-viewer.min.js')
+    .then(function() { appLog('info', 'Lecteur d\'avatar (model-viewer) prêt'); })
+    .catch(function(e) { appLog('warn', 'Chargement du lecteur d\'avatar échoué : ' + e.message); });
+}
+function avatarSpeak() {
+  var inp = document.getElementById('avatarText');
+  var txt = inp ? inp.value.trim() : '';
+  if (!txt) { appLog('warn', 'Entrez un texte à faire dire à l\'avatar'); return; }
+  var cap = document.getElementById('avatarCaption');
+  if (cap) cap.textContent = '💬 ' + txt;
+  speakFR(txt);
+  var mv = document.getElementById('avatarMv');
+  if (mv && mv.style.display !== 'none') {
+    try { mv.currentTime = 0; if (mv.play) mv.play(); } catch(e) {}
+  }
+  if (typeof recordEvent === 'function') recordEvent('🧑', 'Avatar', 'a joué : ' + txt);
 }
 
 /* ── LOG SYSTEM ────────────────────────────────────────── */
@@ -3139,6 +3217,7 @@ async function makeSentence() {
     }).then(function(x) { return x.json(); });
     if (r.result) {
       _showNaturalSent(r.result, false);
+      var av = document.getElementById('avatarText'); if (av) av.value = r.result;
       speakFR(r.result);
       addConv('me', 'sign', r.result);
       if (typeof recordEvent === 'function') recordEvent('✨', 'Phrase formée par l\'IA', r.result);
@@ -3562,6 +3641,17 @@ def _llm_complete(prompt, max_tokens=200):
     except Exception as e:
         print('[LLM] error:', e)
         return None, str(e)[:160]
+
+_AVATAR_FILE = Path(__file__).parent / 'avatar.glb'
+
+@app.route('/avatar/model.glb')
+def avatar_model():
+    if _AVATAR_FILE.exists() and _AVATAR_FILE.stat().st_size > 100:
+        resp = Response(_AVATAR_FILE.read_bytes(), mimetype='model/gltf-binary')
+        resp.headers['Cache-Control'] = 'public, max-age=3600'
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+        return resp
+    return 'avatar non configuré', 404
 
 @app.route('/api/enhance', methods=['POST'])
 def enhance():

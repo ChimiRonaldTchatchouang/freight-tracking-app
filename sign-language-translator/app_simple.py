@@ -912,6 +912,15 @@ textarea{resize:vertical;min-height:100px;grid-column:1/-1}
   .app-nav .anav span{display:none}
   .lp-nav-links a:not(.btn-hero){display:none}
 }
+/* ══ ALPHABET LSF ════════════════════════════════════════ */
+.alpha-note{font-size:11px;color:var(--muted);line-height:1.55;margin-bottom:.75rem}
+.ref-item.alpha{position:relative;cursor:help}
+.alpha-letter{font-size:22px;font-weight:900;color:var(--brand);line-height:1}
+.ref-item.alpha .ref-label{display:none}
+.ref-item.alpha.live{border-color:#22c55e;background:#ecfdf5}
+body.dark .ref-item.alpha.live{background:#0f2a1e;border-color:#16a34a}
+.alpha-live{position:absolute;top:3px;right:5px;color:#22c55e;font-size:9px}
+
 /* ══ DARK THEME ══════════════════════════════════════════ */
 body.dark{
   --bg:#0a0a12;--card:#14141f;--border:#262639;--text:#e7e9f2;--muted:#9096ad;
@@ -1393,6 +1402,13 @@ body.dark .ai-ic,body.dark .hist-ic,body.dark .feat-ic,body.dark .qa-ic{filter:b
           <div class="learned-hdr">✎ Mes signes appris</div>
           <div class="ref-grid" id="learnedRefGrid"></div>
         </div>
+      </div>
+
+      <!-- Alphabet LSF (dactylologie) -->
+      <div class="card">
+        <div class="card-hdr">🔤 Alphabet LSF (dactylologie)</div>
+        <div class="alpha-note">Épellation des noms propres (Livret « Petit guide pratique de la LSF »). Notre détecteur reconnaît la <strong>forme de main</strong> : plusieurs lettres partagent une même forme. La lettre <strong>I</strong> <span style="color:#22c55e">●</span> est reconnue en direct ; survolez une lettre pour son mouvement.</div>
+        <div class="ref-grid" id="alphaGrid"></div>
       </div>
 
     </div>
@@ -2255,7 +2271,58 @@ var SIGNS = [
     p:{thumb:true, index:true,  middle:false, ring:false, pinky:false, dir:null} },
   { key:'BOIRE_S',  emoji:'🥤', fr:'BOIRE',        en:'Drink',       desc:'Pouce + Index + Majeur levés, annulaire et auriculaire repliés (main demi-ouverte, Laveau)',
     p:{thumb:true, index:true,  middle:true,  ring:false, pinky:false, dir:null} },
+  // ── Dactylologie LSF (Livret « Petit guide pratique de la LSF ») ──
+  // Seules les lettres à forme de main UNIQUE dans notre modèle 5-doigts sont
+  // détectées en direct. La lettre I (auriculaire seul) est la seule forme
+  // libre de l'alphabet ; les autres partagent leur forme (voir ALPHABET).
+  { key:'LETTRE_I', emoji:'🅸', fr:'Lettre I', en:'Letter I', desc:'Dactylologie : auriculaire levé seul',
+    p:{thumb:false, index:false, middle:false, ring:false, pinky:true, dir:null} },
 ];
+
+/* ── ALPHABET LSF (dactylologie) — référence complète du livret ──
+   share = forme de main partagée (notre détecteur voit la forme, pas la lettre).
+   live  = reconnue en direct par le classifieur. */
+var ALPHABET = [
+  { l:'A', desc:'Poing fermé, pouce le long de l\'index',              share:'poing (comme OUI)' },
+  { l:'B', desc:'Main plate, 4 doigts serrés levés, pouce replié',      share:'4 doigts (comme QUATRE)' },
+  { l:'C', desc:'Main courbée en forme de C',                           share:'main courbée' },
+  { l:'D', desc:'Index levé seul, autres doigts repliés',               share:'index (comme UN)' },
+  { l:'E', desc:'Doigts repliés, pouce devant les ongles',              share:'poing (comme OUI)' },
+  { l:'F', desc:'Pouce + index en cercle, 3 doigts levés',              share:'comme OK' },
+  { l:'G', desc:'Index et pouce tendus à l\'horizontale',              share:'pouce+index (comme DEUX)' },
+  { l:'H', desc:'Index et majeur tendus serrés, à l\'horizontale',     share:'2 doigts (comme PAIX)' },
+  { l:'I', desc:'Auriculaire levé seul',                                share:'', live:true },
+  { l:'J', desc:'Auriculaire levé traçant un « J »',                    share:'auriculaire + mouvement' },
+  { l:'K', desc:'Index + majeur levés, pouce entre les deux',           share:'pouce+2 doigts (comme BOIRE)' },
+  { l:'L', desc:'Pouce et index tendus en angle droit (L)',             share:'pouce+index (comme DEUX)' },
+  { l:'M', desc:'Trois doigts repliés par-dessus le pouce',             share:'poing (comme OUI)' },
+  { l:'N', desc:'Deux doigts repliés par-dessus le pouce',              share:'poing (comme OUI)' },
+  { l:'O', desc:'Doigts arrondis touchant le pouce (O)',                share:'main fermée en O' },
+  { l:'P', desc:'Comme K, pointé vers le bas',                          share:'pouce+2 doigts (comme BOIRE)' },
+  { l:'Q', desc:'Comme G, pointé vers le bas',                          share:'pouce+index (comme DEUX)' },
+  { l:'R', desc:'Index et majeur croisés, levés',                       share:'2 doigts (comme PAIX)' },
+  { l:'S', desc:'Poing fermé, pouce devant les doigts',                 share:'poing (comme OUI)' },
+  { l:'T', desc:'Pouce coincé entre index et majeur, poing',            share:'poing (comme OUI)' },
+  { l:'U', desc:'Index et majeur levés, serrés',                        share:'2 doigts (comme PAIX)' },
+  { l:'V', desc:'Index et majeur levés, écartés (V)',                   share:'2 doigts (comme PAIX)' },
+  { l:'W', desc:'Index, majeur et annulaire levés',                     share:'3 doigts (comme TROIS)' },
+  { l:'X', desc:'Index plié en crochet',                                share:'index crochu' },
+  { l:'Y', desc:'Pouce et auriculaire tendus',                          share:'pouce+auriculaire (comme APPELER)' },
+  { l:'Z', desc:'Index tendu traçant un « Z »',                         share:'index + mouvement' }
+];
+
+function renderAlphabet() {
+  var g = document.getElementById('alphaGrid');
+  if (!g) return;
+  g.innerHTML = '';
+  ALPHABET.forEach(function(a) {
+    var d = document.createElement('div');
+    d.className = 'ref-item alpha' + (a.live ? ' live' : '');
+    d.title = a.desc + (a.share ? ' — forme partagée : ' + a.share : '') + (a.live ? ' — reconnue en direct ✓' : '');
+    d.innerHTML = '<span class="alpha-letter">' + a.l + '</span>' + (a.live ? '<span class="alpha-live">●</span>' : '');
+    g.appendChild(d);
+  });
+}
 
 function buildRefGrid() {
   var g = document.getElementById('refGrid');
@@ -2274,6 +2341,7 @@ function buildRefGrid() {
     d.innerHTML = '<span class="bi-badge">2M</span><span class="ref-emoji">' + s.emoji + '</span><span class="ref-label">' + s.fr + '</span>';
     g.appendChild(d);
   });
+  renderAlphabet();
   // Learned signs section
   var sec = document.getElementById('learnedSignsSec');
   var lg  = document.getElementById('learnedRefGrid');

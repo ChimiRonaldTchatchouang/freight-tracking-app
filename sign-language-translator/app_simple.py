@@ -4,6 +4,7 @@ from flask_cors import CORS
 import os, re, time, threading
 from concurrent.futures import ThreadPoolExecutor
 from urllib.request import urlopen, Request
+from urllib.error import HTTPError
 from pathlib import Path
 
 app = Flask(__name__)
@@ -4203,6 +4204,31 @@ _LLM_DEFAULT_MODEL = {
     'anthropic': 'claude-3-5-haiku-latest',
 }
 
+_LLM_RETRY_CODES = (429, 500, 502, 503, 504)   # transitoires : on réessaie
+
+def _post_json(url, body, headers, tries=3, timeout=20):
+    """POST JSON avec réessais + backoff sur erreurs transitoires (503 « surcharge », etc.)."""
+    delay, last = 0.8, 'error'
+    for i in range(tries):
+        try:
+            req = Request(url, data=_json.dumps(body).encode('utf-8'), headers=headers)
+            with urlopen(req, timeout=timeout) as r:
+                return _json.loads(r.read()), None
+        except HTTPError as e:
+            code = getattr(e, 'code', 0)
+            try: detail = e.read().decode('utf-8', 'ignore')[:160]
+            except Exception: detail = ''
+            last = 'HTTP %s %s' % (code, detail)
+            if code in _LLM_RETRY_CODES and i < tries - 1:
+                time.sleep(delay); delay *= 2; continue
+            return None, last
+        except Exception as e:
+            last = str(e)[:160]
+            if i < tries - 1:
+                time.sleep(delay); delay *= 2; continue
+            return None, last
+    return None, last
+
 def _llm_complete(prompt, max_tokens=200, key=None, provider=None, model=None):
     # Clé/fournisseur fournis par le client (BYOK) sinon variables d'environnement.
     key = key or os.environ.get('LLM_API_KEY', '')
@@ -4212,35 +4238,42 @@ def _llm_complete(prompt, max_tokens=200, key=None, provider=None, model=None):
     model = model or os.environ.get('LLM_MODEL', '') or _LLM_DEFAULT_MODEL.get(provider, 'gemini-flash-latest')
     try:
         if provider == 'gemini':
-            url = ('https://generativelanguage.googleapis.com/v1beta/models/'
-                   + model + ':generateContent?key=' + key)
             body = {'contents': [{'parts': [{'text': prompt}]}],
                     'generationConfig': {'temperature': 0.3, 'maxOutputTokens': max_tokens}}
-            req = Request(url, data=_json.dumps(body).encode('utf-8'),
-                          headers={'Content-Type': 'application/json'})
-            with urlopen(req, timeout=25) as r:
-                d = _json.loads(r.read())
-            return d['candidates'][0]['content']['parts'][0]['text'].strip(), None
+            # Réessais sur le modèle demandé, puis bascule sur un modèle de secours
+            # si Gemini reste surchargé (503) ou indisponible.
+            candidates, seen = [], set()
+            for m in [model, 'gemini-flash-latest', 'gemini-2.0-flash']:
+                if m and m not in seen: seen.add(m); candidates.append(m)
+            last = 'error'
+            for m in candidates:
+                url = ('https://generativelanguage.googleapis.com/v1beta/models/'
+                       + m + ':generateContent?key=' + key)
+                d, err = _post_json(url, body, {'Content-Type': 'application/json'})
+                if d is not None:
+                    try:
+                        return d['candidates'][0]['content']['parts'][0]['text'].strip(), None
+                    except Exception:
+                        last = 'réponse vide'; continue
+                last = err
+                # on ne bascule de modèle que si surcharge/indispo/introuvable
+                if not any(x in (err or '') for x in ('503', '500', '404', '429')):
+                    break
+            return None, last
         elif provider == 'groq':
             body = {'model': model, 'temperature': 0.3, 'max_tokens': max_tokens,
                     'messages': [{'role': 'user', 'content': prompt}]}
-            req = Request('https://api.groq.com/openai/v1/chat/completions',
-                          data=_json.dumps(body).encode('utf-8'),
-                          headers={'Content-Type': 'application/json',
-                                   'Authorization': 'Bearer ' + key})
-            with urlopen(req, timeout=25) as r:
-                d = _json.loads(r.read())
+            d, err = _post_json('https://api.groq.com/openai/v1/chat/completions', body,
+                                {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key})
+            if d is None: return None, err
             return d['choices'][0]['message']['content'].strip(), None
         elif provider == 'anthropic':
             body = {'model': model, 'max_tokens': max_tokens,
                     'messages': [{'role': 'user', 'content': prompt}]}
-            req = Request('https://api.anthropic.com/v1/messages',
-                          data=_json.dumps(body).encode('utf-8'),
-                          headers={'Content-Type': 'application/json',
-                                   'x-api-key': key,
-                                   'anthropic-version': '2023-06-01'})
-            with urlopen(req, timeout=25) as r:
-                d = _json.loads(r.read())
+            d, err = _post_json('https://api.anthropic.com/v1/messages', body,
+                                {'Content-Type': 'application/json', 'x-api-key': key,
+                                 'anthropic-version': '2023-06-01'})
+            if d is None: return None, err
             return d['content'][0]['text'].strip(), None
         return None, 'bad-provider'
     except Exception as e:
